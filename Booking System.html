@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>放射藥物預約系統</title>
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    #calendar { height: 750px; width: 95%; margin: 10px auto; border: 1px solid #ccc; }
+    .tips { text-align: center; color: #666; font-size: 14px; margin-bottom: 10px; }
+    .controls { text-align: center; margin-bottom: 15px; }
+    .btn-global-limit {
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-global-limit:hover { background-color: #5a6268; }
+  </style>
+</head>
+<body>
+
+  <h2 style="text-align: center;">放射藥物中心預約日曆</h2>
+  
+  <div id="announcement" style="
+    background-color: #fff3cd; 
+    border: 1px solid #ffeeba; 
+    color: #856404; 
+    padding: 15px; 
+    margin: 10px auto; 
+    width: 95%; 
+    border-radius: 5px; 
+    text-align: center; 
+    font-weight: bold; 
+    cursor: pointer;
+  " title="點擊上方公告 (僅管理員可修改)">載入公告中...</div>
+
+  <div class="controls">
+    <button id="setGlobalLimitBtn" class="btn-global-limit" style="display: none;">⚙️ 設定某日起之預設每日上限</button>
+  </div>
+
+  <div class="tips">提示：請點擊或拖曳選取日期進行操作。星期日為休息日無法預約。一般部門每天預約上限將依系統規則套用。</div>
+  <div id='calendar'></div>
+
+  <script>
+    const SUPABASE_URL = 'https://xmbxdhlczolshrdxbwnm.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtYnhkaGxjem9sc2hyZHhid25tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MDI4NDQsImV4cCI6MjEwMjI3ODg0NH0.T9jdhxDoeHLCJePpV--aexc69gGSJj3BeItLNcZMzK8';
+    
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let currentUser = null;
+    let calendar = null;
+    let pmRanges = []; // 存放 PM 區間
+
+    function getStatusColor(status) {
+      switch ((status || '').toLowerCase()) {
+        case 'pending': return '#f0ad4e';
+        case 'confirmed': return '#5cb85c';
+        case 'pm': return '#d9534f';
+        default: return '#333333';
+      }
+    }
+  
+    document.addEventListener('DOMContentLoaded', async function() {
+      // 1. 登入程序
+      let deptData = null;
+      while (!deptData) {
+        let deptInput = prompt("請輸入您的部門代號 (如 UNE, AH):");
+        if (deptInput === null) return; 
+        if (!deptInput.trim()) { alert("未輸入部門代號，請重新輸入。"); continue; }
+
+        let passInput = prompt("請輸入您的密碼:");
+        if (passInput === null) return;
+        if (!passInput) { alert("未輸入密碼，請重新輸入。"); continue; }
+
+        const deptCode = deptInput.trim().toUpperCase();
+
+        try {
+          const { data, error } = await supabaseClient
+            .from('departments')
+            .select('*')
+            .eq('dept_code', deptCode)
+            .eq('password', passInput)
+            .single();
+
+          if (error || !data) {
+            alert("登入失敗：部門代號或密碼錯誤，請重新登入！");
+          } else {
+            deptData = data;
+          }
+        } catch (err) {
+          alert("驗證過程發生錯誤: " + err.message + "\n請再試一次。");
+        }
+      }
+
+      currentUser = deptData;
+      alert(`歡迎 ${currentUser.dept_code} 登入成功！`);
+
+      const isAdmin = currentUser.is_admin || currentUser.dept_code === 'UNE';
+
+      // 如果是管理員，顯示「設定某日起預設上限」按鈕
+      if (isAdmin) {
+        document.getElementById('setGlobalLimitBtn').style.display = 'inline-block';
+      }
+
+      // 綁定動態預設上限按鈕事件
+      document.getElementById('setGlobalLimitBtn').addEventListener('click', async () => {
+        let startDateInput = prompt("請輸入新上限的【生效起始日期】(格式 YYYY-MM-DD)：", new Date().toISOString().split('T')[0]);
+        if (!startDateInput) return;
+
+        let inputLimit = prompt(`請輸入從 ${startDateInput} 開始的新預設每日 Booking 上限：`, "2");
+        if (inputLimit === null) return;
+        let limitVal = parseInt(inputLimit);
+        if (isNaN(limitVal) || limitVal < 0) return alert("請輸入有效的數字！");
+
+        const { error } = await supabaseClient.from('default_limits').upsert({
+          effective_date: startDateInput.trim(),
+          max_limit: limitVal
+        }, { onConflict: 'effective_date' });
+
+        if (error) {
+          alert("更新失敗（請確認是否有建立 default_limits 資料表）：" + error.message);
+        } else {
+          alert(`已成功設定：自 ${startDateInput.trim()} 起，預設每日上限改為 ${limitVal} 個！`);
+        }
+      });
+
+      // 載入 PM 區間
+      async function loadPmRanges() {
+        const { data, error } = await supabaseClient.from('pm_events').select('*');
+        if (!error && data) {
+          pmRanges = data;
+          if (calendar) calendar.refetchEvents();
+        }
+      }
+      loadPmRanges();
+
+      // 2. 公告欄處理
+      const annDiv = document.getElementById('announcement');
+      async function loadAnnouncement() {
+        const { data, error } = await supabaseClient.from('announcements').select('message').eq('id', 1).single();
+        if (!error && data) annDiv.innerText = data.message;
+      }
+
+      annDiv.addEventListener('click', async () => {
+        if (!isAdmin) return;
+        const newMsg = prompt("【管理員】請輸入新的系統公告內容：", annDiv.innerText);
+        if (newMsg !== null) {
+          const { error } = await supabaseClient.from('announcements').update({ message: newMsg }).eq('id', 1);
+          if (error) alert("更新失敗：" + error.message);
+          else { annDiv.innerText = newMsg; alert("公告已更新！"); }
+        }
+      });
+      loadAnnouncement();
+
+      // 3. 初始化日曆
+      var calendarEl = document.getElementById('calendar');
+      calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
+        displayEventTime: false,
+        editable: true,
+        selectable: true,
+        
+        events: async function(fetchInfo, successCallback, failureCallback) {
+          const { data: bookings, error } = await supabaseClient.from('bookings').select('*, centers(center_code), products(product_name)').neq('status', 'Cancelled');
+          if (error) return failureCallback(error);
+          
+          let events = bookings.map(b => {
+            const canSee = isAdmin || (b.centers && b.centers.center_code === currentUser.dept_code);
+            return {
+              id: b.booking_id,
+              title: canSee ? `[ ${b.centers ? b.centers.center_code : 'N/A'} ] ${b.products ? b.products.product_name : 'N/A'}` : '[RESERVED]',
+              start: b.injection_time,
+              backgroundColor: canSee ? getStatusColor(b.status) : '#888',
+              extendedProps: { centerCode: b.centers ? b.centers.center_code : '' }
+            };
+          });
+
+          // 加上 PM 修正事件（自動將 end 日期加一天以填滿區間）
+          pmRanges.forEach(pm => {
+            let nextDayStr = pm.end_date;
+            if (pm.end_date) {
+              let d = new Date(pm.end_date);
+              d.setDate(d.getDate() + 1);
+              nextDayStr = d.toISOString().split('T')[0];
+            }
+
+            events.push({
+              id: 'pm_' + pm.id,
+              title: `🛠️ PM: ${pm.description || '系統維護'}`,
+              start: pm.start_date,
+              end: nextDayStr,
+              backgroundColor: '#d9534f',
+              allDay: true,
+              extendedProps: { isPmRange: true, pmId: pm.id }
+            });
+          });
+
+          successCallback(events);
+        },
+
+        eventClick: async function(info) {
+          if (!isAdmin) {
+            if (info.event.extendedProps.isPmRange) return;
+            if (info.event.extendedProps.centerCode === currentUser.dept_code) {
+              if (confirm("確定取消預約?")) {
+                const { error } = await supabaseClient.from('bookings').update({ status: 'Cancelled' }).eq('booking_id', info.event.id);
+                if (error) alert("取消失敗：" + error.message);
+                else calendar.refetchEvents();
+              }
+            } else {
+              alert("權限不足");
+            }
+            return;
+          }
+
+          if (info.event.extendedProps.isPmRange) {
+            if (confirm("是否要刪除此 PM 維護區間？")) {
+              const { error } = await supabaseClient.from('pm_events').delete().eq('id', info.event.extendedProps.pmId);
+              if (error) alert("刪除失敗：" + error.message);
+              else { loadPmRanges(); alert("PM 維護區間已刪除"); }
+            }
+            return;
+          }
+
+          let newStatusInput = prompt("輸入狀態: 1:Pending, 2:Confirmed, 3:Cancelled");
+          if (!newStatusInput) return;
+
+          const statusMap = { '1': 'Pending', '2': 'Confirmed', '3': 'Cancelled' };
+          const finalStatus = statusMap[newStatusInput];
+          if (!finalStatus) return alert("無效的狀態代號");
+
+          let staffName = prompt("請輸入經手 Staff 姓名：");
+          if (staffName === null) return;
+
+          const { error } = await supabaseClient.from('bookings').update({ 
+              status: finalStatus,
+              staff_name: staffName.trim()
+          }).eq('booking_id', info.event.id);
+
+          if (error) alert("更新失敗：" + error.message);
+          else { calendar.refetchEvents(); alert("更新成功！"); }
+        },
+
+        select: async function(info) {
+          const startDateStr = info.startStr.split('T')[0];
+          
+          const endDateObj = new Date(info.end);
+          endDateObj.setDate(endDateObj.getDate() - 1);
+          const calculatedEndDateStr = endDateObj.toISOString().split('T')[0];
+
+          const isAdmin = currentUser.is_admin || currentUser.dept_code === 'UNE';
+
+          let actionChoice = "1";
+
+          if (isAdmin) {
+            let actionPrompt = "請選擇您想執行的動作：\n1. BOOKING (新增預約)\n2. PM (設定維護期間)";
+            actionChoice = prompt(actionPrompt, "1");
+            if (!actionChoice) return;
+          }
+
+          // --- 選項 2: PM 設定 ---
+          if (actionChoice === '2') {
+            if (!isAdmin) return alert("權限不足：只有 UNE 管理員可以設定 PM！");
+            let endDateStr = prompt("請輸入 PM 結束日期 (格式 YYYY-MM-DD)：", calculatedEndDateStr);
+            if (!endDateStr) return;
+            let pmDesc = prompt("請輸入 PM 維護說明內容：", "儀器維護");
+
+            const { error } = await supabaseClient.from('pm_events').insert([{
+              start_date: startDateStr,
+              end_date: endDateStr,
+              description: pmDesc
+            }]);
+
+            if (error) alert("新增 PM 失敗：" + error.message);
+            else { alert("PM 維護期間設定成功！"); loadPmRanges(); }
+            return;
+          }
+
+          // --- 選項 1: BOOKING (新增預約) ---
+          if (actionChoice === '1') {
+            if (info.start.getDay() === 0) {
+              return alert("星期日為休息日，無法進行預約！");
+            }
+
+            const isBlocked = pmRanges.some(pm => startDateStr >= pm.start_date && startDateStr <= pm.end_date);
+            if (isBlocked && !isAdmin) {
+              return alert("該日期位於系統維護 (PM) 期間，無法進行預約！");
+            }
+
+            // 取得每日上限：優先檢查單日覆寫 -> 檢查動態生效規則 -> 預設 2
+            let dailyLimit = 2;
+            const { data: exactLimitData } = await supabaseClient.from('daily_limits').select('max_limit').eq('date', startDateStr).single();
+            if (exactLimitData) {
+              dailyLimit = exactLimitData.max_limit;
+            } else {
+              const { data: ruleData, error: ruleErr } = await supabaseClient
+                .from('default_limits')
+                .select('max_limit')
+                .lte('effective_date', startDateStr)
+                .order('effective_date', { ascending: false })
+                .limit(1);
+
+              if (!ruleErr && ruleData && ruleData.length > 0) {
+                dailyLimit = ruleData[0].max_limit;
+              }
+            }
+
+            if (!isAdmin) {
+              const { data: existingBookings, error: checkError } = await supabaseClient
+                .from('bookings')
+                .select('booking_id')
+                .gte('injection_time', startDateStr + 'T00:00:00')
+                .lte('injection_time', startDateStr + 'T23:59:59')
+                .neq('status', 'Cancelled');
+
+              if (!checkError && existingBookings && existingBookings.length >= dailyLimit) {
+                return alert(`該日期 (${startDateStr}) 的預約已達上限（當日最多 ${dailyLimit} 個），無法再新增！`);
+              }
+            }
+
+            let targetCenterCode = currentUser.dept_code;
+            if (isAdmin) {
+              let inputCenter = prompt("您目前為管理員/UNE身份，請輸入要幫哪個 Center 代約的代號 (例如 AH):");
+              if (!inputCenter) return;
+              targetCenterCode = inputCenter.trim().toUpperCase();
+            }
+
+            let p = prompt("選擇藥物: 1:C-11, 2:F-18");
+            if (!p) return;
+            const prodName = p === '1' ? 'C-11 Acetate' : 'F-18 PSMA-1007';
+
+            const { data: prod, error: prodErr } = await supabaseClient.from('products').select('product_id').ilike('product_name', `%${prodName}%`).single();
+            if (prodErr || !prod) return alert("找不到對應的藥物資料");
+
+            const { data: center, error: centerErr } = await supabaseClient.from('centers').select('center_id').eq('center_code', targetCenterCode).single();
+            if (centerErr || !center) return alert(`找不到代號為 "${targetCenterCode}" 的中心資料`);
+            
+            const bookingDateTime = startDateStr + 'T11:00:00';
+
+            const { error: insertErr } = await supabaseClient.from('bookings').insert([{ 
+              center_id: center.center_id, 
+              product_id: prod.product_id, 
+              injection_time: bookingDateTime, 
+              status: 'Pending' 
+            }]);
+
+            if (insertErr) alert("預約失敗：" + insertErr.message);
+            else { alert(`已成功為 [${targetCenterCode}] 於 ${startDateStr} 11:00 建立預約！`); calendar.refetchEvents(); }
+          }
+        }
+      });
+      calendar.render();
+    });
+  </script>
+</body>
+</html>
