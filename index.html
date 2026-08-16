@@ -3,8 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>放射藥物預約系統</title>
+  <!-- FullCalendar CDN -->
   <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+  <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- SweetAlert2 漂亮彈窗 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     body { font-family: sans-serif; margin: 20px; }
     #calendar { height: 750px; width: 95%; margin: 10px auto; border: 1px solid #ccc; }
@@ -63,58 +67,86 @@
         default: return '#333333';
       }
     }
-  
-    document.addEventListener('DOMContentLoaded', async function() {
-      // 1. 登入程序
+
+    // 漂亮登入視窗函數 (SweetAlert2)
+    async function performLogin() {
       let deptData = null;
+
       while (!deptData) {
-        let deptInput = prompt("請輸入您的部門代號 (如 UNE, AH):");
-        if (deptInput === null) return; 
-        if (!deptInput.trim()) { alert("未輸入部門代號，請重新輸入。"); continue; }
-
-        let passInput = prompt("請輸入您的密碼:");
-        if (passInput === null) return;
-        if (!passInput) { alert("未輸入密碼，請重新輸入。"); continue; }
-
-        const deptCode = deptInput.trim().toUpperCase();
-
-        try {
-          const { data, error } = await supabaseClient
-            .from('departments')
-            .select('*')
-            .eq('dept_code', deptCode)
-            .eq('password', passInput)
-            .single();
-
-          if (error || !data) {
-            alert("登入失敗：部門代號或密碼錯誤，請重新登入！");
-          } else {
-            deptData = data;
+        const { value: formValues } = await Swal.fire({
+          title: '請登入系統',
+          html:
+            '<input id="swal-input-dept" class="swal2-input" placeholder="部門代號 (如 UNE, AH)">' +
+            '<input id="swal-input-pass" type="password" class="swal2-input" placeholder="密碼">',
+          focusConfirm: false,
+          allowOutsideClick: false,
+          preConfirm: () => {
+            return [
+              document.getElementById('swal-input-dept').value,
+              document.getElementById('swal-input-pass').value
+            ]
           }
-        } catch (err) {
-          alert("驗證過程發生錯誤: " + err.message + "\n請再試一次。");
+        });
+
+        if (!formValues) return null;
+        const [deptCode, password] = formValues;
+        if (!deptCode || !password) {
+          Swal.showValidationMessage('請輸入代號與密碼');
+          continue;
+        }
+
+        // 驗證邏輯
+        const { data, error } = await supabaseClient
+          .from('departments')
+          .select('*')
+          .eq('dept_code', deptCode.toUpperCase())
+          .eq('password', password)
+          .single();
+
+        if (error || !data) {
+          await Swal.fire({ icon: 'error', title: '登入失敗', text: '代號或密碼錯誤，請重新輸入。' });
+        } else {
+          deptData = data;
+          await Swal.fire({ icon: 'success', title: `歡迎 ${deptData.dept_code}`, timer: 1500, showConfirmButton: false });
         }
       }
+      return deptData;
+    }
 
-      currentUser = deptData;
-      alert(`歡迎 ${currentUser.dept_code} 登入成功！`);
+    document.addEventListener('DOMContentLoaded', async function() {
+      // 1. 執行登入程序
+      currentUser = await performLogin();
+      if (!currentUser) return;
 
       const isAdmin = currentUser.is_admin || currentUser.dept_code === 'UNE';
 
-      // 如果是管理員，顯示「設定某日起預設上限」按鈕
+      // 2. 如果是管理員，顯示「設定某日起預設上限」按鈕
       if (isAdmin) {
         document.getElementById('setGlobalLimitBtn').style.display = 'inline-block';
       }
 
       // 綁定動態預設上限按鈕事件
       document.getElementById('setGlobalLimitBtn').addEventListener('click', async () => {
-        let startDateInput = prompt("請輸入新上限的【生效起始日期】(格式 YYYY-MM-DD)：", new Date().toISOString().split('T')[0]);
+        const { value: startDateInput } = await Swal.fire({
+          title: '設定新上限生效起始日',
+          input: 'text',
+          inputAttributes: { type: 'date' },
+          inputValue: new Date().toISOString().split('T')[0],
+          showCancelButton: true
+        });
         if (!startDateInput) return;
 
-        let inputLimit = prompt(`請輸入從 ${startDateInput} 開始的新預設每日 Booking 上限：`, "2");
-        if (inputLimit === null) return;
+        const { value: inputLimit } = await Swal.fire({
+          title: `自 ${startDateInput} 起每日上限`,
+          input: 'number',
+          inputValue: 2,
+          inputAttributes: { min: 0, step: 1 },
+          showCancelButton: true
+        });
+        if (inputLimit === undefined || inputLimit === null || inputLimit === "") return;
+        
         let limitVal = parseInt(inputLimit);
-        if (isNaN(limitVal) || limitVal < 0) return alert("請輸入有效的數字！");
+        if (isNaN(limitVal) || limitVal < 0) return Swal.fire({ icon: 'error', title: '錯誤', text: '請輸入有效的數字！' });
 
         const { error } = await supabaseClient.from('default_limits').upsert({
           effective_date: startDateInput.trim(),
@@ -122,13 +154,13 @@
         }, { onConflict: 'effective_date' });
 
         if (error) {
-          alert("更新失敗（請確認是否有建立 default_limits 資料表）：" + error.message);
+          Swal.fire({ icon: 'error', title: '更新失敗', text: error.message });
         } else {
-          alert(`已成功設定：自 ${startDateInput.trim()} 起，預設每日上限改為 ${limitVal} 個！`);
+          Swal.fire({ icon: 'success', title: '設定成功', text: `自 ${startDateInput.trim()} 起，預設每日上限改為 ${limitVal} 個！` });
         }
       });
 
-      // 載入 PM 區間
+      // 3. 載入 PM 區間
       async function loadPmRanges() {
         const { data, error } = await supabaseClient.from('pm_events').select('*');
         if (!error && data) {
@@ -138,7 +170,7 @@
       }
       loadPmRanges();
 
-      // 2. 公告欄處理
+      // 4. 公告欄處理
       const annDiv = document.getElementById('announcement');
       async function loadAnnouncement() {
         const { data, error } = await supabaseClient.from('announcements').select('message').eq('id', 1).single();
@@ -147,16 +179,25 @@
 
       annDiv.addEventListener('click', async () => {
         if (!isAdmin) return;
-        const newMsg = prompt("【管理員】請輸入新的系統公告內容：", annDiv.innerText);
-        if (newMsg !== null) {
+        const { value: newMsg } = await Swal.fire({
+          title: '【管理員】更新公告',
+          input: 'textarea',
+          inputValue: annDiv.innerText,
+          showCancelButton: true
+        });
+
+        if (newMsg !== undefined && newMsg !== null) {
           const { error } = await supabaseClient.from('announcements').update({ message: newMsg }).eq('id', 1);
-          if (error) alert("更新失敗：" + error.message);
-          else { annDiv.innerText = newMsg; alert("公告已更新！"); }
+          if (error) Swal.fire({ icon: 'error', title: '更新失敗', text: error.message });
+          else { 
+            annDiv.innerText = newMsg; 
+            Swal.fire({ icon: 'success', title: '成功', text: '公告已更新！', timer: 1500, showConfirmButton: false }); 
+          }
         }
       });
       loadAnnouncement();
 
-      // 3. 初始化日曆
+      // 5. 初始化日曆
       var calendarEl = document.getElementById('calendar');
       calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
@@ -204,46 +245,84 @@
         },
 
         eventClick: async function(info) {
+          // 一般使用者
           if (!isAdmin) {
             if (info.event.extendedProps.isPmRange) return;
             if (info.event.extendedProps.centerCode === currentUser.dept_code) {
-              if (confirm("確定取消預約?")) {
+              const { isConfirmed } = await Swal.fire({
+                title: '確定取消預約?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: '確定取消',
+                cancelButtonText: '保留'
+              });
+              if (isConfirmed) {
                 const { error } = await supabaseClient.from('bookings').update({ status: 'Cancelled' }).eq('booking_id', info.event.id);
-                if (error) alert("取消失敗：" + error.message);
-                else calendar.refetchEvents();
+                if (error) Swal.fire({ icon: 'error', title: '取消失敗', text: error.message });
+                else { 
+                  calendar.refetchEvents(); 
+                  Swal.fire({ icon: 'success', title: '已取消', timer: 1500, showConfirmButton: false }); 
+                }
               }
             } else {
-              alert("權限不足");
+              Swal.fire({ icon: 'error', title: '無法操作', text: '權限不足' });
             }
             return;
           }
 
+          // 管理員點擊 PM 區段
           if (info.event.extendedProps.isPmRange) {
-            if (confirm("是否要刪除此 PM 維護區間？")) {
+            const { isConfirmed } = await Swal.fire({
+              title: '刪除 PM 維護區間？',
+              text: '刪除後該日期將開放預約',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#d33',
+              confirmButtonText: '確定刪除'
+            });
+            if (isConfirmed) {
               const { error } = await supabaseClient.from('pm_events').delete().eq('id', info.event.extendedProps.pmId);
-              if (error) alert("刪除失敗：" + error.message);
-              else { loadPmRanges(); alert("PM 維護區間已刪除"); }
+              if (error) Swal.fire({ icon: 'error', title: '刪除失敗', text: error.message });
+              else { 
+                loadPmRanges(); 
+                Swal.fire({ icon: 'success', title: '已刪除 PM 區間', timer: 1500, showConfirmButton: false }); 
+              }
             }
             return;
           }
 
-          let newStatusInput = prompt("輸入狀態: 1:Pending, 2:Confirmed, 3:Cancelled");
-          if (!newStatusInput) return;
+          // 管理員點擊預約（更新狀態）
+          const { value: finalStatus } = await Swal.fire({
+            title: '更新預約狀態',
+            input: 'radio',
+            inputOptions: {
+              'Pending': '🟡 Pending (待處理)',
+              'Confirmed': '🟢 Confirmed (已確認)',
+              'Cancelled': '🔴 Cancelled (取消)'
+            },
+            showCancelButton: true
+          });
+          if (!finalStatus) return;
 
-          const statusMap = { '1': 'Pending', '2': 'Confirmed', '3': 'Cancelled' };
-          const finalStatus = statusMap[newStatusInput];
-          if (!finalStatus) return alert("無效的狀態代號");
-
-          let staffName = prompt("請輸入經手 Staff 姓名：");
-          if (staffName === null) return;
+          const { value: staffName } = await Swal.fire({
+            title: '經手 Staff 姓名',
+            input: 'text',
+            inputPlaceholder: '請輸入您的姓名...',
+            showCancelButton: true
+          });
+          if (!staffName) return;
 
           const { error } = await supabaseClient.from('bookings').update({ 
               status: finalStatus,
               staff_name: staffName.trim()
           }).eq('booking_id', info.event.id);
 
-          if (error) alert("更新失敗：" + error.message);
-          else { calendar.refetchEvents(); alert("更新成功！"); }
+          if (error) Swal.fire({ icon: 'error', title: '更新失敗', text: error.message });
+          else { 
+            calendar.refetchEvents(); 
+            Swal.fire({ icon: 'success', title: '更新成功！', timer: 1500, showConfirmButton: false }); 
+          }
         },
 
         select: async function(info) {
@@ -253,22 +332,43 @@
           endDateObj.setDate(endDateObj.getDate() - 1);
           const calculatedEndDateStr = endDateObj.toISOString().split('T')[0];
 
-          const isAdmin = currentUser.is_admin || currentUser.dept_code === 'UNE';
-
           let actionChoice = "1";
 
           if (isAdmin) {
-            let actionPrompt = "請選擇您想執行的動作：\n1. BOOKING (新增預約)\n2. PM (設定維護期間)";
-            actionChoice = prompt(actionPrompt, "1");
-            if (!actionChoice) return;
+            const { value } = await Swal.fire({
+              title: '請選擇您的動作',
+              input: 'radio',
+              inputOptions: {
+                '1': '📅 BOOKING (新增預約)',
+                '2': '🛠️ PM (設定維護期間)'
+              },
+              inputValue: '1',
+              showCancelButton: true
+            });
+            if (!value) return;
+            actionChoice = value;
           }
 
           // --- 選項 2: PM 設定 ---
           if (actionChoice === '2') {
-            if (!isAdmin) return alert("權限不足：只有 UNE 管理員可以設定 PM！");
-            let endDateStr = prompt("請輸入 PM 結束日期 (格式 YYYY-MM-DD)：", calculatedEndDateStr);
+            if (!isAdmin) return Swal.fire({ icon: 'error', title: '權限不足', text: '只有 UNE 管理員可以設定 PM！' });
+            
+            const { value: endDateStr } = await Swal.fire({
+              title: 'PM 結束日期',
+              input: 'text',
+              inputAttributes: { type: 'date' },
+              inputValue: calculatedEndDateStr,
+              showCancelButton: true
+            });
             if (!endDateStr) return;
-            let pmDesc = prompt("請輸入 PM 維護說明內容：", "儀器維護");
+
+            const { value: pmDesc } = await Swal.fire({
+              title: 'PM 維護說明',
+              input: 'text',
+              inputValue: '儀器維護',
+              showCancelButton: true
+            });
+            if (pmDesc === undefined) return; // 使用者按取消
 
             const { error } = await supabaseClient.from('pm_events').insert([{
               start_date: startDateStr,
@@ -276,23 +376,26 @@
               description: pmDesc
             }]);
 
-            if (error) alert("新增 PM 失敗：" + error.message);
-            else { alert("PM 維護期間設定成功！"); loadPmRanges(); }
+            if (error) Swal.fire({ icon: 'error', title: '新增失敗', text: error.message });
+            else { 
+              Swal.fire({ icon: 'success', title: '設定成功', text: 'PM 維護期間設定成功！', timer: 1500, showConfirmButton: false }); 
+              loadPmRanges(); 
+            }
             return;
           }
 
           // --- 選項 1: BOOKING (新增預約) ---
           if (actionChoice === '1') {
             if (info.start.getDay() === 0) {
-              return alert("星期日為休息日，無法進行預約！");
+              return Swal.fire({ icon: 'warning', title: '休息日', text: '星期日為休息日，無法進行預約！' });
             }
 
             const isBlocked = pmRanges.some(pm => startDateStr >= pm.start_date && startDateStr <= pm.end_date);
             if (isBlocked && !isAdmin) {
-              return alert("該日期位於系統維護 (PM) 期間，無法進行預約！");
+              return Swal.fire({ icon: 'warning', title: '系統維護', text: '該日期位於系統維護 (PM) 期間，無法進行預約！' });
             }
 
-            // 取得每日上限：優先檢查單日覆寫 -> 檢查動態生效規則 -> 預設 2
+            // 取得每日總額度上限
             let dailyLimit = 2;
             const { data: exactLimitData } = await supabaseClient.from('daily_limits').select('max_limit').eq('date', startDateStr).single();
             if (exactLimitData) {
@@ -319,26 +422,62 @@
                 .neq('status', 'Cancelled');
 
               if (!checkError && existingBookings && existingBookings.length >= dailyLimit) {
-                return alert(`該日期 (${startDateStr}) 的預約已達上限（當日最多 ${dailyLimit} 個），無法再新增！`);
+                return Swal.fire({ 
+                  icon: 'warning', 
+                  title: '額度已滿', 
+                  text: `該日期 (${startDateStr}) 的總預約已達上限（當日最多 ${dailyLimit} 個），無法再新增！` 
+                });
               }
             }
 
             let targetCenterCode = currentUser.dept_code;
             if (isAdmin) {
-              let inputCenter = prompt("您目前為管理員/UNE身份，請輸入要幫哪個 Center 代約的代號 (例如 AH):");
+              const { value: inputCenter } = await Swal.fire({
+                title: '幫哪個 Center 代約？',
+                input: 'text',
+                inputPlaceholder: '請輸入代號 (例如 AH)',
+                showCancelButton: true
+              });
               if (!inputCenter) return;
               targetCenterCode = inputCenter.trim().toUpperCase();
             }
 
-            let p = prompt("選擇藥物: 1:C-11, 2:F-18");
-            if (!p) return;
-            const prodName = p === '1' ? 'C-11 Acetate' : 'F-18 PSMA-1007';
+            const { data: center, error: centerErr } = await supabaseClient.from('centers').select('center_id').eq('center_code', targetCenterCode).single();
+            if (centerErr || !center) return Swal.fire({ icon: 'error', title: '查無資料', text: `找不到代號為 "${targetCenterCode}" 的中心資料` });
+
+            // 檢查：每個 Center 同一日不能預約超過 1 個 Case，除非登入者是 UNE
+            if (currentUser.dept_code !== 'UNE') {
+              const { data: centerExistingBookings, error: centerCheckErr } = await supabaseClient
+                .from('bookings')
+                .select('booking_id')
+                .eq('center_id', center.center_id)
+                .gte('injection_time', startDateStr + 'T00:00:00')
+                .lte('injection_time', startDateStr + 'T23:59:59')
+                .neq('status', 'Cancelled');
+
+              if (!centerCheckErr && centerExistingBookings && centerExistingBookings.length > 0) {
+                return Swal.fire({ 
+                  icon: 'warning', 
+                  title: '預約限制', 
+                  text: `${targetCenterCode} 在該日期 (${startDateStr}) 已經有一個預約案子。\n\n每個中心每日限預約 1 個 Case（如需加約請聯絡 UNE 協助代約）！` 
+                });
+              }
+            }
+
+            // 選擇藥物
+            const { value: prodName } = await Swal.fire({
+              title: '請選擇預約藥物',
+              input: 'radio',
+              inputOptions: {
+                'C-11 Acetate': '💊 C-11 Acetate',
+                'F-18 PSMA-1007': '💊 F-18 PSMA-1007'
+              },
+              showCancelButton: true
+            });
+            if (!prodName) return;
 
             const { data: prod, error: prodErr } = await supabaseClient.from('products').select('product_id').ilike('product_name', `%${prodName}%`).single();
-            if (prodErr || !prod) return alert("找不到對應的藥物資料");
-
-            const { data: center, error: centerErr } = await supabaseClient.from('centers').select('center_id').eq('center_code', targetCenterCode).single();
-            if (centerErr || !center) return alert(`找不到代號為 "${targetCenterCode}" 的中心資料`);
+            if (prodErr || !prod) return Swal.fire({ icon: 'error', title: '系統錯誤', text: '找不到對應的藥物資料' });
             
             const bookingDateTime = startDateStr + 'T11:00:00';
 
@@ -349,8 +488,12 @@
               status: 'Pending' 
             }]);
 
-            if (insertErr) alert("預約失敗：" + insertErr.message);
-            else { alert(`已成功為 [${targetCenterCode}] 於 ${startDateStr} 11:00 建立預約！`); calendar.refetchEvents(); }
+            if (insertErr) {
+              Swal.fire({ icon: 'error', title: '預約失敗', text: insertErr.message });
+            } else { 
+              Swal.fire({ icon: 'success', title: '預約成功', text: `已成功為 [${targetCenterCode}] 於 ${startDateStr} 建立預約！`, timer: 2000, showConfirmButton: false }); 
+              calendar.refetchEvents(); 
+            }
           }
         }
       });
