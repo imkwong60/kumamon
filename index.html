@@ -355,9 +355,9 @@
             `).join('');
 
             document.getElementById('work-detail-content').innerHTML = `
-                <!-- 主產品區：左圖右說明 -->
+                <!-- 主產品區：左圖右說明（兩邊都 sticky） -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start mb-20">
-                    <div class="relative aspect-square bg-white rounded-[2.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-[#d2d2d7]/30">
+                    <div class="relative aspect-square bg-white rounded-[2.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-[#d2d2d7]/30 lg:sticky lg:top-24">
                         <img src="${work.image}" alt="${work.title}" class="w-full h-full object-cover">
                     </div>
                     <div class="lg:py-8 lg:sticky lg:top-24">
