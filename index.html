@@ -253,14 +253,68 @@
     <!-- Scripts -->
     <script>
         // --- MOCK DATA ---
-        const MOCK_WORKS = [
-            { id: 'w1', title: 'Ethereal Dreams', category: 'Digital Art', description: 'A mesmerizing digital painting exploring the boundaries of subconscious thought and ethereal landscapes.', fullDescription: 'Ethereal Dreams is a masterclass in AI-assisted generative art. By combining multiple diffusion models, this piece captures a unique blend of surrealism and hyper-realism. Perfect for modern interior spaces seeking a touch of the extraordinary. High-resolution 8K download included.', price: 49, image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop', tags: ['Abstract', 'Surreal', '8K'] },
-            { id: 'w2', title: 'Neon Genesis Prompt Pack', category: 'Prompt Collection', description: 'A curated collection of 50+ highly optimized prompts for Midjourney v6, focusing on cyberpunk aesthetics.', fullDescription: 'Stop guessing and start creating. This prompt pack has been meticulously tested and refined to guarantee stunning cyberpunk and sci-fi results every time. Includes a PDF guide on parameter tweaking and aspect ratio optimization.', price: 29, image: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=1000&auto=format&fit=crop', tags: ['Midjourney', 'Cyberpunk', 'Tool'] },
-            { id: 'w3', title: 'Whispers in the Code', category: 'Short Story', description: 'An interactive sci-fi short story about an AI that discovers poetry hidden within its own training data.', fullDescription: 'Immerse yourself in a narrative that questions the nature of consciousness and creativity. "Whispers in the Code" is a 15,000-word novella generated in collaboration with large language models, edited and polished for a deeply moving reading experience.', price: 12, image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000&auto=format&fit=crop', tags: ['Fiction', 'Sci-Fi', 'eBook'] },
-            { id: 'w4', title: 'Monochrome Silence', category: 'Digital Art', description: 'A minimalist exploration of light and shadow. High-contrast monochromatic digital download.', fullDescription: 'Stripped of color, this piece forces the viewer to focus on texture and composition. "Monochrome Silence" is a versatile piece that commands attention without overwhelming the space. Includes commercial usage rights for small projects.', price: 35, image: 'https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?q=80&w=1000&auto=format&fit=crop', tags: ['Minimalist', 'B&W', 'License'] },
-            { id: 'w5', title: 'Lo-Fi Beats Vol. 1', category: 'Audio', description: '10 exclusive, AI-generated lo-fi tracks perfect for background listening, coding, or studying. Royalty-free.', fullDescription: 'Chill, atmospheric, and completely unique. This album was generated using cutting-edge audio models and mastered for warm, analog-style sound. Use them in your YouTube videos, podcasts, or just vibe out.', price: 19, image: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=1000&auto=format&fit=crop', tags: ['Music', 'Lo-Fi', 'Royalty-Free'] },
-            { id: 'w6', title: 'Aesthetic Notion Template', category: 'Template', description: 'Organize your creative life with this dark-mode, minimalist Notion workspace designed for artists.', fullDescription: 'A fully integrated system for tracking projects, collecting inspiration, and managing your creative output. Features custom AI-generated cover images and a structured database for seamless workflow.', price: 15, image: 'https://images.unsplash.com/photo-1542435503-956c469947f6?q=80&w=1000&auto=format&fit=crop', tags: ['Productivity', 'Notion', 'Design'] }
-        ];
+       const MOCK_WORKS = [
+    {
+        id: 'w1',
+        title: 'J.Law Mindmap',
+        category: 'System Architecture',
+        description: 'A living architecture of interconnected thoughts.<br>互聯思維與模組化系統的動態架構。<br>相互接続された思考とシステムのエコシステム。',
+        fullDescription: 'EN: An expanding, centralized map of projects, tools, and curiosities.<br>CN: 一張不斷擴展的專案、工具與好奇心中心化地圖。<br>JP: プロジェクト、ツール、好奇心の中心的なマップ。',
+        price: 0,
+        image: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?q=80&w=1000&auto=format&fit=crop',
+        tags: ['Mindmap', 'Architecture', 'System']
+    },
+    {
+        id: 'w2',
+        title: 'Python & Data Pipeline Kit',
+        category: 'Digital Tools',
+        description: 'Streamlined scripts and automation templates.<br>用於數據分析與工作流優化的精簡腳本。<br>データ分析とワークフロー最適化のためのスクリプト。',
+        fullDescription: 'EN: Modular Python scripts built to eliminate repetitive tasks.<br>CN: 旨在消除重複性任務的模組化 Python 腳本與自動化工具。<br>JP: 定型作業を排除するために構築されたモジュール式Pythonスクリプト。',
+        price: 0,
+        image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1000&auto=format&fit=crop',
+        tags: ['Python', 'Automation', 'Data']
+    },
+    {
+        id: 'w3',
+        title: 'JLPT & Language Acquisition Guides',
+        category: 'Learning Systems',
+        description: 'Structured grammar frameworks for self-directed learners.<br>針對自學者優化的結構化文法與語言框架。<br>独学者向けの構造化された文法と語彙フレームワーク。',
+        fullDescription: 'EN: Advanced Japanese language acquisition matrices and sentence synthesis templates.<br>CN: 進階日語習得矩陣與句子合成模板。<br>JP: 高度な日本語習得マトリックスと文脈合成テンプレート。',
+        price: 0,
+        image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=1000&auto=format&fit=crop',
+        tags: ['Japanese', 'JLPT', 'Education']
+    },
+    {
+        id: 'w4',
+        title: 'Linux / Ubuntu Terminal Configs',
+        category: 'Configurations',
+        description: 'Clean dotfiles and system optimization setups.<br>打造極致開發環境的乾淨 dotfiles 與配置。<br>開発環境のためのクリーンなドットファイルと設定。',
+        fullDescription: 'EN: Shell scripts designed for a frictionless developer workspace.<br>CN: 為無摩擦開發工作區設計的 Shell 自動化腳本。<br>JP: スムーズな開発ワークスペース用のシェルスクリプト。',
+        price: 0,
+        image: 'https://images.unsplash.com/photo-1629654297299-c8506221ca97?q=80&w=1000&auto=format&fit=crop',
+        tags: ['Linux', 'Terminal', 'Dotfiles']
+    },
+    {
+        id: 'w5',
+        title: 'Modular PKM Notion Workspace',
+        category: 'Template',
+        description: 'A dark-mode, system-driven workspace.<br>專為知識管理與數位資產設計的系統化工作區。<br>知識管理とデジタル資産のためのシステムワークスペース。',
+        fullDescription: 'EN: Keep your digital life synchronized with custom databases.<br>CN: 使用自訂資料庫同步你的數位生活與研究筆記。<br>JP: カスタムデータベースでデジタルライフを同期。',
+        price: 0,
+        image: 'https://images.unsplash.com/photo-1542435503-956c469947f6?q=80&w=1000&auto=format&fit=crop',
+        tags: ['Notion', 'Productivity', 'PKM']
+    },
+    {
+        id: 'w6',
+        title: 'Efficiency & Scripting Toolkit',
+        category: 'Toolkit',
+        description: 'Micro-tools and automation scripts for life-hackers.<br>專為現代生活駭客設計的微型工具與自動化合集。<br>ライフハッカーのためのマイクロツールと自動化スクリプト。',
+        fullDescription: 'EN: Optimized for speed, reliability, and minimal resource usage.<br>CN: 以速度、可靠性與最低資源消耗為核心進行優化。<br>JP: スピード、信頼性、最小限のリソース使用量に最適化。',
+        price: 0,
+        image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1000&auto=format&fit=crop',
+        tags: ['Tools', 'Scripts', 'Efficiency']
+    }
+];
 
         // --- STATE ---
         let cart = [];
