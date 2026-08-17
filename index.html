@@ -104,7 +104,8 @@
 
                 <section class="px-6 max-w-6xl mx-auto pb-24">
                     <div class="rounded-[2.5rem] overflow-hidden bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] aspect-video relative flex items-center justify-center">
-                   <img src="images/mindmap.png" alt="我的心智圖">
+                       <!-- 確保圖片路徑正確 -->
+                       <img src="images/mindmap.png" alt="我的心智圖" class="w-full h-full object-cover">
                     </div>
                 </section>
 
@@ -186,23 +187,19 @@
             </div>
         </div>
 
-<!-- VIEW: ABOUT -->
-<div id="view-about" class="view">
-    <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
-        <h1 class="text-5xl md:text-6xl font-semibold tracking-tight mb-8">About.</h1>
-        
-        <!-- 英文副標（字體較小、較淡） -->
-        <p class="text-[#86868b] text-sm md:text-base font-medium mb-8 tracking-wide uppercase opacity-80">
-            Scientist, life-hacker, and digital curator. Built for exploration, optimized for curiosity.
-        </p>
-
-        <!-- 中文主內文 -->
-        <p class="text-[#86868b] text-xl font-medium mb-16 leading-relaxed">
-            <span class="block text-slate-900 font-semibold mb-3">科學家、生活駭客與數碼資產管理人。</span>
-            歡迎來到我的私人合成實驗室：這裏是專注於探索程式、語言學習、效率工具與模組化知識系統的基地。為探索而建，為好奇心而優化。
-        </p>
-    </div>
-</div>
+        <!-- VIEW: ABOUT -->
+        <div id="view-about" class="view">
+            <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
+                <h1 class="text-5xl md:text-6xl font-semibold tracking-tight mb-8">About.</h1>
+                <p class="text-[#86868b] text-sm md:text-base font-medium mb-8 tracking-wide uppercase opacity-80">
+                    Scientist, life-hacker, and digital curator. Built for exploration, optimized for curiosity.
+                </p>
+                <p class="text-[#86868b] text-xl font-medium mb-16 leading-relaxed">
+                    <span class="block text-slate-900 font-semibold mb-3">科學家、生活駭客與數碼資產管理人。</span>
+                    歡迎來到我的私人合成實驗室：這裏是專注於探索程式、語言學習、效率工具與模組化知識系統的基地。為探索而建，為好奇心而優化。
+                </p>
+            </div>
+        </div>
 
         <!-- VIEW: CONTACT -->
         <div id="view-contact" class="view">
@@ -252,91 +249,79 @@
 
     <!-- Scripts -->
     <script>
-        // --- MOCK DATA ---
-       const MOCK_WORKS = [
-{
-        id: 'w1',
-        title: 'J.Law Mindmap',
-        category: 'Laboratory Architecture',
-        description: `
-            <span class="block text-slate-900 font-semibold text-base mb-1">A living architecture of interconnected thoughts.</span>
-            <span class="block text-slate-600 text-sm mb-0.5">互聯思維與模組化系統的動態架構。</span>
-            <span class="block text-slate-400 text-xs tracking-wide">相互接続された思考とシステムのエコシステム。</span>
-        `,
-        fullDescription: `
-            <span class="block text-slate-900 font-medium text-sm mb-1">EN: An expanding, centralized map of projects, tools, and curiosities.</span>
-            <span class="block text-slate-600 text-sm mb-1">CN: 一張不斷擴展的專案、工具與好奇心中心化地圖。</span>
-            <span class="block text-slate-400 text-xs">JP: プロジェクト、ツール、好奇心の中心的なマップ。</span>
-        `,
-        image: 'images/mindmap.png',
-        tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear']
-    },
-    {
-        id: 'w2',
-        title: 'Python & Data Pipeline Kit',
-        category: 'Digital Tools',
-        description: 'Streamlined scripts and automation templates.<br>用於數據分析與工作流優化的精簡腳本。<br>データ分析とワークフロー最適化のためのスクリプト。',
-        fullDescription: 'EN: Modular Python scripts built to eliminate repetitive tasks.<br>CN: 旨在消除重複性任務的模組化 Python 腳本與自動化工具。<br>JP: 定型作業を排除するために構築されたモジュール式Pythonスクリプト。',
-        price: 0,
-        image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Python', 'Automation', 'Data']
-    },
-    {
-        id: 'w3',
-        title: 'JLPT & Language Acquisition Guides',
-        category: 'Learning Systems',
-        description: 'Structured grammar frameworks for self-directed learners.<br>針對自學者優化的結構化文法與語言框架。<br>独学者向けの構造化された文法と語彙フレームワーク。',
-        fullDescription: 'EN: Advanced Japanese language acquisition matrices and sentence synthesis templates.<br>CN: 進階日語習得矩陣與句子合成模板。<br>JP: 高度な日本語習得マトリックスと文脈合成テンプレート。',
-        price: 0,
-        image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Japanese', 'JLPT', 'Education']
-    },
-    {
-        id: 'w4',
-        title: 'Linux / Ubuntu Terminal Configs',
-        category: 'Configurations',
-        description: 'Clean dotfiles and system optimization setups.<br>打造極致開發環境的乾淨 dotfiles 與配置。<br>開発環境のためのクリーンなドットファイルと設定。',
-        fullDescription: 'EN: Shell scripts designed for a frictionless developer workspace.<br>CN: 為無摩擦開發工作區設計的 Shell 自動化腳本。<br>JP: スムーズな開発ワークスペース用のシェルスクリプト。',
-        price: 0,
-        image: 'https://images.unsplash.com/photo-1629654297299-c8506221ca97?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Linux', 'Terminal', 'Dotfiles']
-    },
-    {
-        id: 'w5',
-        title: 'Modular PKM Notion Workspace',
-        category: 'Template',
-        description: 'A dark-mode, system-driven workspace.<br>專為知識管理與數位資產設計的系統化工作區。<br>知識管理とデジタル資産のためのシステムワークスペース。',
-        fullDescription: 'EN: Keep your digital life synchronized with custom databases.<br>CN: 使用自訂資料庫同步你的數位生活與研究筆記。<br>JP: カスタムデータベースでデジタルライフを同期。',
-        price: 0,
-        image: 'https://images.unsplash.com/photo-1542435503-956c469947f6?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Notion', 'Productivity', 'PKM']
-    },
-    {
-        id: 'w6',
-        title: 'Efficiency & Scripting Toolkit',
-        category: 'Toolkit',
-        description: 'Micro-tools and automation scripts for life-hackers.<br>專為現代生活駭客設計的微型工具與自動化合集。<br>ライフハッカーのためのマイクロツールと自動化スクリプト。',
-        fullDescription: 'EN: Optimized for speed, reliability, and minimal resource usage.<br>CN: 以速度、可靠性與最低資源消耗為核心進行優化。<br>JP: スピード、信頼性、最小限のリソース使用量に最適化。',
-        price: 0,
-        image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Tools', 'Scripts', 'Efficiency']
-    }
-];
+        const MOCK_WORKS = [
+            {
+                id: 'w1',
+                title: 'J.Law Mindmap',
+                category: 'Laboratory Architecture',
+                description: 'A living architecture of interconnected thoughts.',
+                fullDescription: 'An expanding, centralized map of projects, tools, and curiosities.',
+                price: 0,
+                image: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear']
+            },
+            {
+                id: 'w2',
+                title: 'Python & Data Pipeline Kit',
+                category: 'Digital Tools',
+                description: 'Streamlined scripts and automation templates.',
+                fullDescription: 'Modular Python scripts built to eliminate repetitive tasks.',
+                price: 0,
+                image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Python', 'Automation', 'Data']
+            },
+            {
+                id: 'w3',
+                title: 'JLPT & Language Acquisition Guides',
+                category: 'Learning Systems',
+                description: 'Structured grammar frameworks for self-directed learners.',
+                fullDescription: 'Advanced Japanese language acquisition matrices and sentence synthesis templates.',
+                price: 0,
+                image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Japanese', 'JLPT', 'Education']
+            },
+            {
+                id: 'w4',
+                title: 'Linux / Ubuntu Terminal Configs',
+                category: 'Configurations',
+                description: 'Clean dotfiles and system optimization setups.',
+                fullDescription: 'Shell scripts designed for a frictionless developer workspace.',
+                price: 0,
+                image: 'https://images.unsplash.com/photo-1629654297299-c8506221ca97?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Linux', 'Terminal', 'Dotfiles']
+            },
+            {
+                id: 'w5',
+                title: 'Modular PKM Notion Workspace',
+                category: 'Template',
+                description: 'A dark-mode, system-driven workspace.',
+                fullDescription: 'Keep your digital life synchronized with custom databases.',
+                price: 0,
+                image: 'https://images.unsplash.com/photo-1542435503-956c469947f6?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Notion', 'Productivity', 'PKM']
+            },
+            {
+                id: 'w6',
+                title: 'Efficiency & Scripting Toolkit',
+                category: 'Toolkit',
+                description: 'Micro-tools and automation scripts for life-hackers.',
+                fullDescription: 'Optimized for speed, reliability, and minimal resource usage.',
+                price: 0,
+                image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Tools', 'Scripts', 'Efficiency']
+            }
+        ];
 
-        // --- STATE ---
         let cart = [];
         let isMobileMenuOpen = false;
         let toastTimeout;
 
-        // --- CORE FUNCTIONS ---
-
-        // Generate HTML for a work card
         function createWorkCardHTML(work, index) {
             const delayClass = index % 3 === 0 ? '' : index % 3 === 1 ? 'delay-100' : 'delay-200';
             return `
                 <div class="group cursor-pointer animate-fade-in opacity-0 ${delayClass} bg-white rounded-[2rem] p-4 shadow-[0_4px_24px_rgb(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] transition-all duration-300 border border-[#d2d2d7]/30 flex flex-col h-full" onclick="navigate('work-detail', '${work.id}')">
                     <div class="relative aspect-[4/3] bg-[#f5f5f7] rounded-[1.5rem] overflow-hidden mb-6">
-                        <img ="${work.image}" alt="${work.title}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                        <img src="${work.image}" alt="${work.title}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
                     </div>
                     <div class="px-2 pb-2 flex-grow flex flex-col justify-between">
                         <div>
@@ -351,13 +336,11 @@
             `;
         }
 
-        // Render works on specific grids
         function renderGrids() {
             document.getElementById('home-works-grid').innerHTML = MOCK_WORKS.slice(0, 3).map(createWorkCardHTML).join('');
             document.getElementById('all-works-grid').innerHTML = MOCK_WORKS.map(createWorkCardHTML).join('');
         }
 
-        // Render work detail page
         function renderWorkDetail(workId) {
             const work = MOCK_WORKS.find(w => w.id === workId);
             if (!work) return;
@@ -385,7 +368,6 @@
             `;
         }
 
-        // Render checkout page
         function renderCheckout() {
             const container = document.getElementById('checkout-content');
             
@@ -440,7 +422,6 @@
             `;
         }
 
-        // Cart Actions
         function addToCart(workId) {
             const work = MOCK_WORKS.find(w => w.id === workId);
             if (!cart.find(item => item.id === workId)) {
@@ -476,17 +457,12 @@
             }
         }
 
-        // UI Helpers
         function showToast(message) {
             const toast = document.getElementById('toast');
             document.getElementById('toast-message').innerText = message;
-            
             toast.classList.remove('hidden');
-            
             clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                toast.classList.add('hidden');
-            }, 3000);
+            toastTimeout = setTimeout(() => { toast.classList.add('hidden'); }, 3000);
         }
 
         function toggleMobileMenu() {
@@ -512,49 +488,31 @@
             event.target.reset();
         }
 
-        // Navigation
         function navigate(route, id = null) {
-            // Hide all views
-            document.querySelectorAll('.view').forEach(el => {
-                el.classList.remove('active');
-            });
-            
-            // Update active nav link styles
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-link').forEach(el => {
-                if(el.dataset.target === route) {
-                    el.classList.add('text-[#0071e3]');
-                } else {
-                    el.classList.remove('text-[#0071e3]');
-                }
+                if(el.dataset.target === route) el.classList.add('text-[#0071e3]');
+                else el.classList.remove('text-[#0071e3]');
             });
 
-            // Show target view
             const targetView = document.getElementById('view-' + route);
             if (targetView) {
                 targetView.classList.add('active');
-                
-                // Re-trigger fade in animation
                 const animatedContent = targetView.querySelector('.animate-fade-in');
                 if (animatedContent) {
                     animatedContent.style.animation = 'none';
-                    animatedContent.offsetHeight; /* trigger reflow */
+                    animatedContent.offsetHeight; 
                     animatedContent.style.animation = null; 
                 }
             }
 
-            // Handle specific view logic
-            if (route === 'work-detail' && id) {
-                renderWorkDetail(id);
-            } else if (route === 'checkout') {
-                renderCheckout();
-            }
+            if (route === 'work-detail' && id) renderWorkDetail(id);
+            else if (route === 'checkout') renderCheckout();
 
-            // Close mobile menu and scroll to top
             if (isMobileMenuOpen) toggleMobileMenu();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Initialize App
         window.onload = () => {
             renderGrids();
             updateCartBadge();
