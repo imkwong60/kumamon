@@ -254,15 +254,23 @@
     <script>
         // --- MOCK DATA ---
        const MOCK_WORKS = [
-    {
+{
         id: 'w1',
         title: 'J.Law Mindmap',
-        category: 'System Architecture',
-        description: 'A living architecture of interconnected thoughts.<br>互聯思維與模組化系統的動態架構。<br>相互接続された思考とシステムのエコシステム。',
-        fullDescription: 'EN: An expanding, centralized map of projects, tools, and curiosities.<br>CN: 一張不斷擴展的專案、工具與好奇心中心化地圖。<br>JP: プロジェクト、ツール、好奇心の中心的なマップ。',
+        category: 'Laboratory Architecture',
+        description: `
+            <span class="block text-slate-900 font-semibold text-base mb-1">A living architecture of interconnected thoughts.</span>
+            <span class="block text-slate-600 text-sm mb-0.5">互聯思維與模組化系統的動態架構。</span>
+            <span class="block text-slate-400 text-xs tracking-wide">相互接続された思考とシステムのエコシステム。</span>
+        `,
+        fullDescription: `
+            <span class="block text-slate-900 font-medium text-sm mb-1">EN: An expanding, centralized map of projects, tools, and curiosities.</span>
+            <span class="block text-slate-600 text-sm mb-1">CN: 一張不斷擴展的專案、工具與好奇心中心化地圖。</span>
+            <span class="block text-slate-400 text-xs">JP: プロジェクト、ツール、好奇心の中心的なマップ。</span>
+        `,
         price: 0,
         image: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Mindmap', 'Architecture', 'System']
+        tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear']
     },
     {
         id: 'w2',
