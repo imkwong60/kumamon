@@ -241,41 +241,20 @@
         id: 'w1',
         title: 'J.Law Mindmap',
         category: 'Laboratory Architecture',
+        description: `
+            <span class="block text-slate-900 font-semibold text-base mb-1">A living architecture of interconnected thoughts.</span>
+            <span class="block text-slate-600 text-sm mb-0.5">互聯思維與模組化系統的動態架構。</span>
+            <span class="block text-slate-400 text-xs tracking-wide">相互接続された思考とシステムのエコシステム。</span>
+        `,
         fullDescription: `
-            <span class="block text-slate-900 font-medium text-sm mb-1">An expanding, centralized map of projects, tools, and curiosities.</span>
-            <span class="block text-slate-600 text-sm mb-1">一張不斷擴展的專案、工具與好奇心中心化地圖。</span>
-            <span class="block text-slate-400 text-xs">プロジェクト、ツール、好奇心の中心的なマップ。</span>`,
-        image: 'images/mindmap/mindmap.png',
-        tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear'],
-// ↓↓↓ 加這段就行 ↓↓↓
-  features: [
-    {
-      image: 'images/mindmap.png',          // 左邊的圖
-      title: 'Interconnected Thinking',     // 標題
-      desc: '用視覺化方式把想法、專案、工具全部連起來。'  // 說明
+            <span class="block text-slate-900 font-medium text-sm mb-1">EN: An expanding, centralized map of projects, tools, and curiosities.</span>
+            <span class="block text-slate-600 text-sm mb-1">CN: 一張不斷擴展的專案、工具與好奇心中心化地圖。</span>
+            <span class="block text-slate-400 text-xs">JP: プロジェクト、ツール、好奇心の中心的なマップ。</span>
+        `,
+        details: '在這裡加入詳細說明。',
+        image: 'images/mindmap.png',
+        tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear']
     },
-    {
-      image: 'images/mindmap.png',
-      title: 'Modular System',
-      desc: '每個節點都可以獨立擴展，方便持續迭代。'
-    },
-    {
-      image: 'images/mindmap.png',
-      title: 'Multi-language Support',
-      desc: '同時支援中文、英文、日文標註。'
-    },
-    {
-      image: 'images/mindmap.png',
-      title: 'Living Document',
-      desc: '不是靜態圖，而是會隨時間成長的知識架構。'
-    },
-    {
-      image: 'images/mindmap.png',
-      title: 'Lab Gear Ready',
-      desc: '專為個人實驗室設計的工具與知識管理系統。'
-    }
-  ]
-},
     {
         id: 'w2',
         title: 'Python & Data Pipeline Kit',
@@ -362,7 +341,15 @@
             if (!work) return;
             const tagsHTML = work.tags.map(tag => `<span class="text-xs font-medium text-[#515154] bg-[#f5f5f7] px-3 py-1.5 rounded-full border border-[#d2d2d7]/50">${tag}</span>`).join('');
 
-            // Feature cards data (可之後改成從 work.features 讀取)
+            // Helper: 判斷是否 YouTube 連結並取出 video ID
+            function getYoutubeId(url) {
+                if (!url) return null;
+                const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+                const match = url.match(regExp);
+                return match ? match[1] : null;
+            }
+
+            // Feature cards data
             const featureCards = work.features || [
                 { image: work.image, title: 'Feature 1', desc: '在這裡加入這個功能的詳細說明。' },
                 { image: work.image, title: 'Feature 2', desc: '在這裡加入這個功能的詳細說明。' },
@@ -371,17 +358,42 @@
                 { image: work.image, title: 'Feature 5', desc: '在這裡加入這個功能的詳細說明。' }
             ];
 
-            const featuresHTML = featureCards.map(f => `
-                <div class="flex flex-col sm:flex-row gap-6 p-5 bg-white rounded-[1.5rem] shadow-[0_4px_24px_rgb(0,0,0,0.03)] border border-[#d2d2d7]/40 items-center">
-                    <div class="w-full sm:w-40 h-40 shrink-0 rounded-2xl overflow-hidden bg-[#f5f5f7] cursor-pointer hover:opacity-90 transition-opacity" onclick="openLightbox('${f.image}')">
-                        <img src="${f.image}" alt="${f.title}" class="w-full h-full object-cover">
+            const featuresHTML = featureCards.map(f => {
+                const ytId = getYoutubeId(f.image);
+                let mediaHTML = '';
+
+                if (ytId) {
+                    // YouTube 影片
+                    mediaHTML = `
+                        <div class="w-full sm:w-56 aspect-video shrink-0 rounded-2xl overflow-hidden bg-black">
+                            <iframe 
+                                src="https://www.youtube.com/embed/${ytId}" 
+                                class="w-full h-full"
+                                frameborder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen>
+                            </iframe>
+                        </div>
+                    `;
+                } else {
+                    // 普通圖片
+                    mediaHTML = `
+                        <div class="w-full sm:w-40 h-40 shrink-0 rounded-2xl overflow-hidden bg-[#f5f5f7] cursor-pointer hover:opacity-90 transition-opacity" onclick="openLightbox('${f.image}')">
+                            <img src="${f.image}" alt="${f.title}" class="w-full h-full object-cover">
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="flex flex-col sm:flex-row gap-6 p-5 bg-white rounded-[1.5rem] shadow-[0_4px_24px_rgb(0,0,0,0.03)] border border-[#d2d2d7]/40 items-center">
+                        ${mediaHTML}
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold tracking-tight text-[#1d1d1f] mb-2">${f.title}</h3>
+                            <p class="text-[#515154] text-base leading-relaxed">${f.desc}</p>
+                        </div>
                     </div>
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold tracking-tight text-[#1d1d1f] mb-2">${f.title}</h3>
-                        <p class="text-[#515154] text-base leading-relaxed">${f.desc}</p>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             document.getElementById('work-detail-content').innerHTML = `
                 <!-- 主產品區：左圖右說明（兩邊都 sticky） -->
