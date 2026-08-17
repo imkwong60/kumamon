@@ -1,504 +1,495 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <title>放射藥物預約系統</title>
-  <!-- FullCalendar CDN -->
-  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-  <!-- Supabase CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- SweetAlert2 漂亮彈窗 CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <style>
-    body { font-family: sans-serif; margin: 20px; }
-    #calendar { height: 750px; width: 95%; margin: 10px auto; border: 1px solid #ccc; }
-    .tips { text-align: center; color: #666; font-size: 14px; margin-bottom: 10px; }
-    .controls { text-align: center; margin-bottom: 15px; }
-    .btn-global-limit {
-      background-color: #6c757d;
-      color: white;
-      border: none;
-      padding: 8px 15px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    .btn-global-limit:hover { background-color: #5a6268; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura. | Pro art. Made accessible.</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #fbfbfd;
+            color: #1d1d1f;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        ::selection {
+            background-color: #0071e3;
+            color: white;
+        }
+
+        /* Smooth Apple-like Fade In Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .delay-100 { animation-delay: 100ms; }
+        .delay-200 { animation-delay: 200ms; }
+
+        /* Clean minimalist scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #86868b; }
+
+        /* Hide views by default */
+        .view { display: none; }
+        .view.active { display: block; }
+    </style>
 </head>
 <body>
 
-  <h2 style="text-align: center;">放射藥物中心預約日曆</h2>
-  
-  <div id="announcement" style="
-    background-color: #fff3cd; 
-    border: 1px solid #ffeeba; 
-    color: #856404; 
-    padding: 15px; 
-    margin: 10px auto; 
-    width: 95%; 
-    border-radius: 5px; 
-    text-align: center; 
-    font-weight: bold; 
-    cursor: pointer;
-  " title="點擊上方公告 (僅管理員可修改)">載入公告中...</div>
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 bg-[#fbfbfd]/80 backdrop-blur-xl border-b border-[#d2d2d7]/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+            <!-- Logo -->
+            <button onclick="navigate('home')" class="text-xl font-semibold tracking-tight hover:opacity-70 transition-opacity flex items-center">
+                Aura.
+            </button>
 
-  <div class="controls">
-    <button id="setGlobalLimitBtn" class="btn-global-limit" style="display: none;">⚙️ 設定某日起之預設每日上限</button>
-  </div>
+            <!-- Desktop Links -->
+            <div class="hidden md:flex items-center space-x-8 text-xs font-medium tracking-wide text-[#1d1d1f]">
+                <button onclick="navigate('works')" class="nav-link hover:text-[#0071e3] transition-colors" data-target="works">Works</button>
+                <button onclick="navigate('about')" class="nav-link hover:text-[#0071e3] transition-colors" data-target="about">About</button>
+                <button onclick="navigate('contact')" class="nav-link hover:text-[#0071e3] transition-colors" data-target="contact">Contact</button>
+            </div>
 
-  <div class="tips">提示：請點擊或拖曳選取日期進行操作。星期日為休息日無法預約。一般部門每天預約上限將依系統規則套用。</div>
-  <div id='calendar'></div>
+            <!-- Bag & Mobile Toggle -->
+            <div class="flex items-center space-x-4 text-[#1d1d1f]">
+                <button onclick="navigate('checkout')" class="relative group p-2 -m-2 hover:text-[#0071e3] transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    <span id="cart-badge" class="hidden absolute top-0 right-0 bg-[#0071e3] text-white text-[10px] font-bold h-4 w-4 rounded-full items-center justify-center transform group-hover:scale-110 transition-transform">0</span>
+                </button>
+                <button class="md:hidden p-2 -m-2 hover:text-[#0071e3] transition-colors" onclick="toggleMobileMenu()">
+                    <svg id="menu-icon-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+                    <svg id="menu-icon-close" class="hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+        </div>
 
-  <script>
-    const SUPABASE_URL = 'https://xmbxdhlczolshrdxbwnm.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtYnhkaGxjem9sc2hyZHhid25tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MDI4NDQsImV4cCI6MjEwMjI3ODg0NH0.T9jdhxDoeHLCJePpV--aexc69gGSJj3BeItLNcZMzK8';
-    
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    let currentUser = null;
-    let calendar = null;
-    let pmRanges = []; // 存放 PM 區間
+        <!-- Mobile Menu Dropdown -->
+        <div id="mobile-menu" class="hidden md:hidden absolute top-14 left-0 w-full bg-[#fbfbfd] border-b border-[#d2d2d7]/50 px-6 py-6 flex flex-col space-y-4 shadow-lg">
+            <button onclick="navigate('works')" class="text-left text-2xl font-semibold tracking-tight">Works</button>
+            <button onclick="navigate('about')" class="text-left text-2xl font-semibold tracking-tight">About</button>
+            <button onclick="navigate('contact')" class="text-left text-2xl font-semibold tracking-tight">Contact</button>
+        </div>
+    </nav>
 
-    function getStatusColor(status) {
-      switch ((status || '').toLowerCase()) {
-        case 'pending': return '#f0ad4e';
-        case 'confirmed': return '#5cb85c';
-        case 'pm': return '#d9534f';
-        default: return '#333333';
-      }
-    }
+    <main class="pt-14 min-h-[calc(100vh-80px)]">
 
-    // 漂亮登入視窗函數 (SweetAlert2)
-    async function performLogin() {
-      let deptData = null;
+        <!-- VIEW: HOME -->
+        <div id="view-home" class="view active">
+            <div class="animate-fade-in opacity-0">
+                <section class="pt-32 pb-20 px-6 flex flex-col items-center text-center max-w-4xl mx-auto">
+                    <h1 class="text-5xl md:text-7xl lg:text-[5.5rem] font-semibold tracking-tight leading-[1.05] mb-6 text-[#1d1d1f]">
+                        Pro art. <br> <span class="text-[#86868b]">Made accessible.</span>
+                    </h1>
+                    <p class="text-xl md:text-2xl text-[#86868b] mb-10 max-w-2xl mx-auto font-medium tracking-tight">
+                        Premium AI-generated artifacts, tools, and templates. Designed meticulously for your next masterpiece.
+                    </p>
+                    <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                        <button onclick="navigate('works')" class="bg-[#0071e3] text-white px-8 py-3.5 rounded-full font-medium tracking-wide hover:bg-[#0077ED] transition-colors text-lg">
+                            Shop the collection
+                        </button>
+                        <button onclick="navigate('about')" class="text-[#0071e3] px-8 py-3.5 rounded-full font-medium tracking-wide hover:underline text-lg flex items-center space-x-1">
+                            <span>Learn more</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="rotate-180 w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        </button>
+                    </div>
+                </section>
 
-      while (!deptData) {
-        const { value: formValues } = await Swal.fire({
-          title: '請登入系統',
-          html:
-            '<input id="swal-input-dept" class="swal2-input" placeholder="部門代號 (如 UNE, AH)">' +
-            '<input id="swal-input-pass" type="password" class="swal2-input" placeholder="密碼">',
-          focusConfirm: false,
-          allowOutsideClick: false,
-          preConfirm: () => {
-            return [
-              document.getElementById('swal-input-dept').value,
-              document.getElementById('swal-input-pass').value
-            ]
-          }
-        });
+                <section class="px-6 max-w-6xl mx-auto pb-24">
+                    <div class="rounded-[2.5rem] overflow-hidden bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] aspect-video relative flex items-center justify-center">
+                        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2000&auto=format&fit=crop" alt="Featured Artwork" class="w-full h-full object-cover">
+                    </div>
+                </section>
 
-        if (!formValues) return null;
-        const [deptCode, password] = formValues;
-        if (!deptCode || !password) {
-          Swal.showValidationMessage('請輸入代號與密碼');
-          continue;
+                <section class="py-20 px-6 max-w-7xl mx-auto border-t border-[#d2d2d7]/50">
+                    <div class="text-center mb-16">
+                        <h2 class="text-4xl font-semibold tracking-tight text-[#1d1d1f] mb-4">Latest releases.</h2>
+                        <button onclick="navigate('works')" class="text-[#0071e3] font-medium hover:underline flex items-center justify-center mx-auto space-x-1">
+                            <span>View all works</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="rotate-180 transform w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        </button>
+                    </div>
+                    <div id="home-works-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Populated by JS -->
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- VIEW: WORKS -->
+        <div id="view-works" class="view">
+            <div class="pt-24 pb-24 px-6 max-w-7xl mx-auto animate-fade-in opacity-0">
+                <div class="text-center mb-16">
+                    <h1 class="text-5xl md:text-6xl font-semibold tracking-tight mb-4">Store.</h1>
+                    <p class="text-xl text-[#86868b] font-medium">Find the perfect asset for your workflow.</p>
+                </div>
+                <div id="all-works-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: WORK DETAIL -->
+        <div id="view-work-detail" class="view">
+            <div class="pt-20 pb-24 px-6 max-w-6xl mx-auto animate-fade-in opacity-0">
+                <button onclick="navigate('works')" class="flex items-center space-x-1 text-[#0071e3] hover:underline transition-all mb-12 w-max font-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    <span>Back to Store</span>
+                </button>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start" id="work-detail-content">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: CHECKOUT -->
+        <div id="view-checkout" class="view">
+            <div class="pt-24 pb-24 px-6 max-w-4xl mx-auto animate-fade-in opacity-0">
+                <h1 class="text-4xl md:text-5xl font-semibold tracking-tight mb-12 text-center">Review your bag.</h1>
+                <div id="checkout-content">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: SUCCESS -->
+        <div id="view-success" class="view">
+            <div class="pt-32 pb-24 px-6 max-w-2xl mx-auto text-center animate-fade-in opacity-0">
+                <h1 class="text-5xl font-semibold tracking-tight mb-6 text-[#1d1d1f]">Thank you.</h1>
+                <p class="text-xl text-[#86868b] mb-12 font-medium">
+                    Your transaction is complete. A receipt and download links have been sent to your email.
+                </p>
+                
+                <div class="bg-white p-8 rounded-[2.5rem] shadow-[0_4px_24px_rgb(0,0,0,0.04)] mb-12">
+                    <h3 class="text-xl font-semibold tracking-tight mb-6 text-left">Your Downloads</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-5 bg-[#f5f5f7] rounded-2xl cursor-pointer group hover:bg-[#ebebeb] transition-colors">
+                            <span class="font-medium text-[#1d1d1f]">Aura_Collection_Files.zip</span>
+                            <div class="text-[#0071e3]">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="navigate('home')" class="text-[#0071e3] font-medium hover:underline text-lg">
+                    Return Home
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW: ABOUT -->
+        <div id="view-about" class="view">
+            <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
+                <h1 class="text-5xl md:text-6xl font-semibold tracking-tight mb-8">About.</h1>
+                <p class="text-[#86868b] text-xl font-medium mb-16 leading-relaxed">
+                    Designing the future of digital art. Aura is a minimalist studio focusing on high-quality, AI-generated assets crafted with extreme attention to detail.
+                </p>
+            </div>
+        </div>
+
+        <!-- VIEW: CONTACT -->
+        <div id="view-contact" class="view">
+            <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
+                <h1 class="text-5xl md:text-6xl font-semibold tracking-tight mb-8">Contact.</h1>
+                <p class="text-[#86868b] text-xl font-medium mb-16 leading-relaxed">
+                    Have a question about our products or want to discuss a collaboration? Reach out below.
+                </p>
+                <form class="space-y-6 text-left max-w-lg mx-auto" onsubmit="handleContactSubmit(event)">
+                    <div>
+                        <input type="text" placeholder="Name" required class="w-full bg-white border border-[#d2d2d7] rounded-xl px-5 py-4 focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition-all text-[#1d1d1f] placeholder-[#86868b]">
+                    </div>
+                    <div>
+                        <input type="email" placeholder="Email" required class="w-full bg-white border border-[#d2d2d7] rounded-xl px-5 py-4 focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition-all text-[#1d1d1f] placeholder-[#86868b]">
+                    </div>
+                    <div>
+                        <textarea placeholder="Message" required rows="5" class="w-full bg-white border border-[#d2d2d7] rounded-xl px-5 py-4 focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition-all text-[#1d1d1f] placeholder-[#86868b]"></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-[#1d1d1f] text-white py-4 rounded-xl font-medium tracking-wide hover:bg-[#000000] transition-colors text-lg">
+                        Send Message
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#f5f5f7] border-t border-[#d2d2d7]/50 py-10 px-6">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-xs text-[#86868b] font-medium">
+            <div class="mb-4 md:mb-0">
+                Copyright © 2026 Aura Inc. All rights reserved.
+            </div>
+            <div class="flex space-x-6">
+                <a href="#" class="hover:text-[#1d1d1f] transition-colors">Privacy Policy</a>
+                <a href="#" class="hover:text-[#1d1d1f] transition-colors">Terms of Use</a>
+                <a href="#" class="hover:text-[#1d1d1f] transition-colors">Sales and Refunds</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-8 right-8 bg-[#1d1d1f]/90 backdrop-blur-lg text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 z-50 animate-fade-in font-medium hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <p id="toast-message" class="text-sm">Message</p>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // --- MOCK DATA ---
+        const MOCK_WORKS = [
+            { id: 'w1', title: 'Ethereal Dreams', category: 'Digital Art', description: 'A mesmerizing digital painting exploring the boundaries of subconscious thought and ethereal landscapes.', fullDescription: 'Ethereal Dreams is a masterclass in AI-assisted generative art. By combining multiple diffusion models, this piece captures a unique blend of surrealism and hyper-realism. Perfect for modern interior spaces seeking a touch of the extraordinary. High-resolution 8K download included.', price: 49, image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop', tags: ['Abstract', 'Surreal', '8K'] },
+            { id: 'w2', title: 'Neon Genesis Prompt Pack', category: 'Prompt Collection', description: 'A curated collection of 50+ highly optimized prompts for Midjourney v6, focusing on cyberpunk aesthetics.', fullDescription: 'Stop guessing and start creating. This prompt pack has been meticulously tested and refined to guarantee stunning cyberpunk and sci-fi results every time. Includes a PDF guide on parameter tweaking and aspect ratio optimization.', price: 29, image: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=1000&auto=format&fit=crop', tags: ['Midjourney', 'Cyberpunk', 'Tool'] },
+            { id: 'w3', title: 'Whispers in the Code', category: 'Short Story', description: 'An interactive sci-fi short story about an AI that discovers poetry hidden within its own training data.', fullDescription: 'Immerse yourself in a narrative that questions the nature of consciousness and creativity. "Whispers in the Code" is a 15,000-word novella generated in collaboration with large language models, edited and polished for a deeply moving reading experience.', price: 12, image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000&auto=format&fit=crop', tags: ['Fiction', 'Sci-Fi', 'eBook'] },
+            { id: 'w4', title: 'Monochrome Silence', category: 'Digital Art', description: 'A minimalist exploration of light and shadow. High-contrast monochromatic digital download.', fullDescription: 'Stripped of color, this piece forces the viewer to focus on texture and composition. "Monochrome Silence" is a versatile piece that commands attention without overwhelming the space. Includes commercial usage rights for small projects.', price: 35, image: 'https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?q=80&w=1000&auto=format&fit=crop', tags: ['Minimalist', 'B&W', 'License'] },
+            { id: 'w5', title: 'Lo-Fi Beats Vol. 1', category: 'Audio', description: '10 exclusive, AI-generated lo-fi tracks perfect for background listening, coding, or studying. Royalty-free.', fullDescription: 'Chill, atmospheric, and completely unique. This album was generated using cutting-edge audio models and mastered for warm, analog-style sound. Use them in your YouTube videos, podcasts, or just vibe out.', price: 19, image: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=1000&auto=format&fit=crop', tags: ['Music', 'Lo-Fi', 'Royalty-Free'] },
+            { id: 'w6', title: 'Aesthetic Notion Template', category: 'Template', description: 'Organize your creative life with this dark-mode, minimalist Notion workspace designed for artists.', fullDescription: 'A fully integrated system for tracking projects, collecting inspiration, and managing your creative output. Features custom AI-generated cover images and a structured database for seamless workflow.', price: 15, image: 'https://images.unsplash.com/photo-1542435503-956c469947f6?q=80&w=1000&auto=format&fit=crop', tags: ['Productivity', 'Notion', 'Design'] }
+        ];
+
+        // --- STATE ---
+        let cart = [];
+        let isMobileMenuOpen = false;
+        let toastTimeout;
+
+        // --- CORE FUNCTIONS ---
+
+        // Generate HTML for a work card
+        function createWorkCardHTML(work, index) {
+            const delayClass = index % 3 === 0 ? '' : index % 3 === 1 ? 'delay-100' : 'delay-200';
+            return `
+                <div class="group cursor-pointer animate-fade-in opacity-0 ${delayClass} bg-white rounded-[2rem] p-4 shadow-[0_4px_24px_rgb(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] transition-all duration-300 border border-[#d2d2d7]/30 flex flex-col h-full" onclick="navigate('work-detail', '${work.id}')">
+                    <div class="relative aspect-[4/3] bg-[#f5f5f7] rounded-[1.5rem] overflow-hidden mb-6">
+                        <img src="${work.image}" alt="${work.title}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                    </div>
+                    <div class="px-2 pb-2 flex-grow flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start mb-1">
+                                <h3 class="text-xl font-semibold tracking-tight text-[#1d1d1f] pr-4">${work.title}</h3>
+                                <span class="text-lg font-semibold text-[#1d1d1f]">$${work.price}</span>
+                            </div>
+                            <p class="text-sm font-medium text-[#86868b]">${work.category}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
-        // 驗證邏輯
-        const { data, error } = await supabaseClient
-          .from('departments')
-          .select('*')
-          .eq('dept_code', deptCode.toUpperCase())
-          .eq('password', password)
-          .single();
-
-        if (error || !data) {
-          await Swal.fire({ icon: 'error', title: '登入失敗', text: '代號或密碼錯誤，請重新輸入。' });
-        } else {
-          deptData = data;
-          await Swal.fire({ icon: 'success', title: `歡迎 ${deptData.dept_code}`, timer: 1500, showConfirmButton: false });
+        // Render works on specific grids
+        function renderGrids() {
+            document.getElementById('home-works-grid').innerHTML = MOCK_WORKS.slice(0, 3).map(createWorkCardHTML).join('');
+            document.getElementById('all-works-grid').innerHTML = MOCK_WORKS.map(createWorkCardHTML).join('');
         }
-      }
-      return deptData;
-    }
 
-    document.addEventListener('DOMContentLoaded', async function() {
-      // 1. 執行登入程序
-      currentUser = await performLogin();
-      if (!currentUser) return;
+        // Render work detail page
+        function renderWorkDetail(workId) {
+            const work = MOCK_WORKS.find(w => w.id === workId);
+            if (!work) return;
 
-      const isAdmin = currentUser.is_admin || currentUser.dept_code === 'UNE';
+            const tagsHTML = work.tags.map(tag => `<span class="text-xs font-medium text-[#515154] bg-[#f5f5f7] px-3 py-1.5 rounded-full border border-[#d2d2d7]/50">${tag}</span>`).join('');
 
-      // 2. 如果是管理員，顯示「設定某日起預設上限」按鈕
-      if (isAdmin) {
-        document.getElementById('setGlobalLimitBtn').style.display = 'inline-block';
-      }
-
-      // 綁定動態預設上限按鈕事件
-      document.getElementById('setGlobalLimitBtn').addEventListener('click', async () => {
-        const { value: startDateInput } = await Swal.fire({
-          title: '設定新上限生效起始日',
-          input: 'text',
-          inputAttributes: { type: 'date' },
-          inputValue: new Date().toISOString().split('T')[0],
-          showCancelButton: true
-        });
-        if (!startDateInput) return;
-
-        const { value: inputLimit } = await Swal.fire({
-          title: `自 ${startDateInput} 起每日上限`,
-          input: 'number',
-          inputValue: 2,
-          inputAttributes: { min: 0, step: 1 },
-          showCancelButton: true
-        });
-        if (inputLimit === undefined || inputLimit === null || inputLimit === "") return;
-        
-        let limitVal = parseInt(inputLimit);
-        if (isNaN(limitVal) || limitVal < 0) return Swal.fire({ icon: 'error', title: '錯誤', text: '請輸入有效的數字！' });
-
-        const { error } = await supabaseClient.from('default_limits').upsert({
-          effective_date: startDateInput.trim(),
-          max_limit: limitVal
-        }, { onConflict: 'effective_date' });
-
-        if (error) {
-          Swal.fire({ icon: 'error', title: '更新失敗', text: error.message });
-        } else {
-          Swal.fire({ icon: 'success', title: '設定成功', text: `自 ${startDateInput.trim()} 起，預設每日上限改為 ${limitVal} 個！` });
+            document.getElementById('work-detail-content').innerHTML = `
+                <div class="relative aspect-square bg-white rounded-[2.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-[#d2d2d7]/30">
+                    <img src="${work.image}" alt="${work.title}" class="w-full h-full object-cover">
+                </div>
+                <div class="lg:py-8 lg:sticky lg:top-24">
+                    <span class="text-sm font-semibold tracking-wide text-[#86868b] uppercase mb-2 block">${work.category}</span>
+                    <h1 class="text-4xl md:text-5xl font-semibold tracking-tight mb-4 leading-tight text-[#1d1d1f]">${work.title}</h1>
+                    <p class="text-2xl font-medium tracking-tight mb-8 text-[#1d1d1f]">$${work.price}</p>
+                    <div class="prose max-w-none text-[#1d1d1f] mb-12 text-lg leading-relaxed">
+                        <p>${work.fullDescription}</p>
+                    </div>
+                    <div class="flex flex-col space-y-4">
+                        <button onclick="addToCart('${work.id}')" class="w-full bg-[#0071e3] text-white py-4 rounded-full font-medium tracking-wide hover:bg-[#0077ED] transition-colors text-lg">
+                            Add to Bag
+                        </button>
+                        <div class="pt-8 mt-4 flex flex-wrap gap-2">${tagsHTML}</div>
+                    </div>
+                </div>
+            `;
         }
-      });
 
-      // 3. 載入 PM 區間
-      async function loadPmRanges() {
-        const { data, error } = await supabaseClient.from('pm_events').select('*');
-        if (!error && data) {
-          pmRanges = data;
-          if (calendar) calendar.refetchEvents();
-        }
-      }
-      loadPmRanges();
-
-      // 4. 公告欄處理
-      const annDiv = document.getElementById('announcement');
-      async function loadAnnouncement() {
-        const { data, error } = await supabaseClient.from('announcements').select('message').eq('id', 1).single();
-        if (!error && data) annDiv.innerText = data.message;
-      }
-
-      annDiv.addEventListener('click', async () => {
-        if (!isAdmin) return;
-        const { value: newMsg } = await Swal.fire({
-          title: '【管理員】更新公告',
-          input: 'textarea',
-          inputValue: annDiv.innerText,
-          showCancelButton: true
-        });
-
-        if (newMsg !== undefined && newMsg !== null) {
-          const { error } = await supabaseClient.from('announcements').update({ message: newMsg }).eq('id', 1);
-          if (error) Swal.fire({ icon: 'error', title: '更新失敗', text: error.message });
-          else { 
-            annDiv.innerText = newMsg; 
-            Swal.fire({ icon: 'success', title: '成功', text: '公告已更新！', timer: 1500, showConfirmButton: false }); 
-          }
-        }
-      });
-      loadAnnouncement();
-
-      // 5. 初始化日曆
-      var calendarEl = document.getElementById('calendar');
-      calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
-        displayEventTime: false,
-        editable: true,
-        selectable: true,
-        
-        events: async function(fetchInfo, successCallback, failureCallback) {
-          const { data: bookings, error } = await supabaseClient.from('bookings').select('*, centers(center_code), products(product_name)').neq('status', 'Cancelled');
-          if (error) return failureCallback(error);
-          
-          let events = bookings.map(b => {
-            const canSee = isAdmin || (b.centers && b.centers.center_code === currentUser.dept_code);
-            return {
-              id: b.booking_id,
-              title: canSee ? `[ ${b.centers ? b.centers.center_code : 'N/A'} ] ${b.products ? b.products.product_name : 'N/A'}` : '[RESERVED]',
-              start: b.injection_time,
-              backgroundColor: canSee ? getStatusColor(b.status) : '#888',
-              extendedProps: { centerCode: b.centers ? b.centers.center_code : '' }
-            };
-          });
-
-          // 加上 PM 修正事件（自動將 end 日期加一天以填滿區間）
-          pmRanges.forEach(pm => {
-            let nextDayStr = pm.end_date;
-            if (pm.end_date) {
-              let d = new Date(pm.end_date);
-              d.setDate(d.getDate() + 1);
-              nextDayStr = d.toISOString().split('T')[0];
+        // Render checkout page
+        function renderCheckout() {
+            const container = document.getElementById('checkout-content');
+            
+            if (cart.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-20 bg-white rounded-[2rem] shadow-[0_4px_24px_rgb(0,0,0,0.02)]">
+                        <h2 class="text-2xl font-semibold tracking-tight mb-4 text-[#1d1d1f]">Your bag is empty.</h2>
+                        <p class="text-[#86868b] mb-8">Add items to your bag to check out.</p>
+                        <button onclick="navigate('works')" class="bg-[#0071e3] text-white px-6 py-3 rounded-full font-medium hover:bg-[#0077ED] transition-colors">Continue Shopping</button>
+                    </div>
+                `;
+                return;
             }
 
-            events.push({
-              id: 'pm_' + pm.id,
-              title: `🛠️ PM: ${pm.description || '系統維護'}`,
-              start: pm.start_date,
-              end: nextDayStr,
-              backgroundColor: '#d9534f',
-              allDay: true,
-              extendedProps: { isPmRange: true, pmId: pm.id }
+            const total = cart.reduce((sum, item) => sum + item.price, 0);
+            
+            const itemsHTML = cart.map(item => `
+                <div class="flex gap-6 p-6 bg-white rounded-[2rem] shadow-[0_4px_24px_rgb(0,0,0,0.02)] items-center">
+                    <div class="w-24 h-24 shrink-0 rounded-2xl overflow-hidden bg-[#f5f5f7]">
+                        <img src="${item.image}" alt="${item.title}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1 flex flex-col justify-center">
+                        <div class="flex items-start justify-between mb-1">
+                            <h3 class="font-semibold text-lg tracking-tight text-[#1d1d1f]">${item.title}</h3>
+                            <p class="font-semibold text-lg text-[#1d1d1f]">$${item.price}</p>
+                        </div>
+                        <p class="text-sm text-[#86868b] mb-3">${item.category}</p>
+                        <div>
+                            <button onclick="removeFromCart('${item.id}')" class="text-sm text-[#0071e3] hover:underline font-medium">Remove</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                    <div class="lg:col-span-2 space-y-6">${itemsHTML}</div>
+                    <div class="bg-white p-8 rounded-[2rem] h-fit shadow-[0_4px_24px_rgb(0,0,0,0.04)]">
+                        <h3 class="font-semibold text-xl tracking-tight mb-6">Bag Summary</h3>
+                        <div class="space-y-4 mb-8 text-[#1d1d1f] text-sm">
+                            <div class="flex justify-between"><span>Subtotal</span><span>$${total}</span></div>
+                            <div class="flex justify-between"><span>Taxes</span><span>Calculated at checkout</span></div>
+                            <div class="flex justify-between font-semibold text-xl pt-6 border-t border-[#d2d2d7]/50">
+                                <span>Total</span><span>$${total}</span>
+                            </div>
+                        </div>
+                        <button onclick="processCheckout()" class="w-full bg-[#1d1d1f] text-white py-4 rounded-full font-medium tracking-wide hover:bg-[#000000] transition-colors flex items-center justify-center space-x-2 text-lg">
+                            <span>Check Out</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Cart Actions
+        function addToCart(workId) {
+            const work = MOCK_WORKS.find(w => w.id === workId);
+            if (!cart.find(item => item.id === workId)) {
+                cart.push(work);
+                showToast(`Added "${work.title}" to your bag.`);
+                updateCartBadge();
+            } else {
+                showToast(`"${work.title}" is already in your bag.`);
+            }
+        }
+
+        function removeFromCart(workId) {
+            cart = cart.filter(item => item.id !== workId);
+            renderCheckout();
+            updateCartBadge();
+        }
+
+        function processCheckout() {
+            cart = [];
+            updateCartBadge();
+            navigate('success');
+        }
+
+        function updateCartBadge() {
+            const badge = document.getElementById('cart-badge');
+            if (cart.length > 0) {
+                badge.innerText = cart.length;
+                badge.classList.remove('hidden');
+                badge.classList.add('flex');
+            } else {
+                badge.classList.add('hidden');
+                badge.classList.remove('flex');
+            }
+        }
+
+        // UI Helpers
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = message;
+            
+            toast.classList.remove('hidden');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        function toggleMobileMenu() {
+            isMobileMenuOpen = !isMobileMenuOpen;
+            const menu = document.getElementById('mobile-menu');
+            const iconOpen = document.getElementById('menu-icon-open');
+            const iconClose = document.getElementById('menu-icon-close');
+            
+            if (isMobileMenuOpen) {
+                menu.classList.remove('hidden');
+                iconOpen.classList.add('hidden');
+                iconClose.classList.remove('hidden');
+            } else {
+                menu.classList.add('hidden');
+                iconOpen.classList.remove('hidden');
+                iconClose.classList.add('hidden');
+            }
+        }
+
+        function handleContactSubmit(event) {
+            event.preventDefault();
+            showToast("Message sent successfully.");
+            event.target.reset();
+        }
+
+        // Navigation
+        function navigate(route, id = null) {
+            // Hide all views
+            document.querySelectorAll('.view').forEach(el => {
+                el.classList.remove('active');
             });
-          });
-
-          successCallback(events);
-        },
-
-        eventClick: async function(info) {
-          // 一般使用者
-          if (!isAdmin) {
-            if (info.event.extendedProps.isPmRange) return;
-            if (info.event.extendedProps.centerCode === currentUser.dept_code) {
-              const { isConfirmed } = await Swal.fire({
-                title: '確定取消預約?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                confirmButtonText: '確定取消',
-                cancelButtonText: '保留'
-              });
-              if (isConfirmed) {
-                const { error } = await supabaseClient.from('bookings').update({ status: 'Cancelled' }).eq('booking_id', info.event.id);
-                if (error) Swal.fire({ icon: 'error', title: '取消失敗', text: error.message });
-                else { 
-                  calendar.refetchEvents(); 
-                  Swal.fire({ icon: 'success', title: '已取消', timer: 1500, showConfirmButton: false }); 
+            
+            // Update active nav link styles
+            document.querySelectorAll('.nav-link').forEach(el => {
+                if(el.dataset.target === route) {
+                    el.classList.add('text-[#0071e3]');
+                } else {
+                    el.classList.remove('text-[#0071e3]');
                 }
-              }
-            } else {
-              Swal.fire({ icon: 'error', title: '無法操作', text: '權限不足' });
-            }
-            return;
-          }
-
-          // 管理員點擊 PM 區段
-          if (info.event.extendedProps.isPmRange) {
-            const { isConfirmed } = await Swal.fire({
-              title: '刪除 PM 維護區間？',
-              text: '刪除後該日期將開放預約',
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonColor: '#d33',
-              confirmButtonText: '確定刪除'
             });
-            if (isConfirmed) {
-              const { error } = await supabaseClient.from('pm_events').delete().eq('id', info.event.extendedProps.pmId);
-              if (error) Swal.fire({ icon: 'error', title: '刪除失敗', text: error.message });
-              else { 
-                loadPmRanges(); 
-                Swal.fire({ icon: 'success', title: '已刪除 PM 區間', timer: 1500, showConfirmButton: false }); 
-              }
-            }
-            return;
-          }
 
-          // 管理員點擊預約（更新狀態）
-          const { value: finalStatus } = await Swal.fire({
-            title: '更新預約狀態',
-            input: 'radio',
-            inputOptions: {
-              'Pending': '🟡 Pending (待處理)',
-              'Confirmed': '🟢 Confirmed (已確認)',
-              'Cancelled': '🔴 Cancelled (取消)'
-            },
-            showCancelButton: true
-          });
-          if (!finalStatus) return;
-
-          const { value: staffName } = await Swal.fire({
-            title: '經手 Staff 姓名',
-            input: 'text',
-            inputPlaceholder: '請輸入您的姓名...',
-            showCancelButton: true
-          });
-          if (!staffName) return;
-
-          const { error } = await supabaseClient.from('bookings').update({ 
-              status: finalStatus,
-              staff_name: staffName.trim()
-          }).eq('booking_id', info.event.id);
-
-          if (error) Swal.fire({ icon: 'error', title: '更新失敗', text: error.message });
-          else { 
-            calendar.refetchEvents(); 
-            Swal.fire({ icon: 'success', title: '更新成功！', timer: 1500, showConfirmButton: false }); 
-          }
-        },
-
-        select: async function(info) {
-          const startDateStr = info.startStr.split('T')[0];
-          
-          const endDateObj = new Date(info.end);
-          endDateObj.setDate(endDateObj.getDate() - 1);
-          const calculatedEndDateStr = endDateObj.toISOString().split('T')[0];
-
-          let actionChoice = "1";
-
-          if (isAdmin) {
-            const { value } = await Swal.fire({
-              title: '請選擇您的動作',
-              input: 'radio',
-              inputOptions: {
-                '1': '📅 BOOKING (新增預約)',
-                '2': '🛠️ PM (設定維護期間)'
-              },
-              inputValue: '1',
-              showCancelButton: true
-            });
-            if (!value) return;
-            actionChoice = value;
-          }
-
-          // --- 選項 2: PM 設定 ---
-          if (actionChoice === '2') {
-            if (!isAdmin) return Swal.fire({ icon: 'error', title: '權限不足', text: '只有 UNE 管理員可以設定 PM！' });
-            
-            const { value: endDateStr } = await Swal.fire({
-              title: 'PM 結束日期',
-              input: 'text',
-              inputAttributes: { type: 'date' },
-              inputValue: calculatedEndDateStr,
-              showCancelButton: true
-            });
-            if (!endDateStr) return;
-
-            const { value: pmDesc } = await Swal.fire({
-              title: 'PM 維護說明',
-              input: 'text',
-              inputValue: '儀器維護',
-              showCancelButton: true
-            });
-            if (pmDesc === undefined) return; // 使用者按取消
-
-            const { error } = await supabaseClient.from('pm_events').insert([{
-              start_date: startDateStr,
-              end_date: endDateStr,
-              description: pmDesc
-            }]);
-
-            if (error) Swal.fire({ icon: 'error', title: '新增失敗', text: error.message });
-            else { 
-              Swal.fire({ icon: 'success', title: '設定成功', text: 'PM 維護期間設定成功！', timer: 1500, showConfirmButton: false }); 
-              loadPmRanges(); 
-            }
-            return;
-          }
-
-          // --- 選項 1: BOOKING (新增預約) ---
-          if (actionChoice === '1') {
-            if (info.start.getDay() === 0) {
-              return Swal.fire({ icon: 'warning', title: '休息日', text: '星期日為休息日，無法進行預約！' });
+            // Show target view
+            const targetView = document.getElementById('view-' + route);
+            if (targetView) {
+                targetView.classList.add('active');
+                
+                // Re-trigger fade in animation
+                const animatedContent = targetView.querySelector('.animate-fade-in');
+                if (animatedContent) {
+                    animatedContent.style.animation = 'none';
+                    animatedContent.offsetHeight; /* trigger reflow */
+                    animatedContent.style.animation = null; 
+                }
             }
 
-            const isBlocked = pmRanges.some(pm => startDateStr >= pm.start_date && startDateStr <= pm.end_date);
-            if (isBlocked && !isAdmin) {
-              return Swal.fire({ icon: 'warning', title: '系統維護', text: '該日期位於系統維護 (PM) 期間，無法進行預約！' });
+            // Handle specific view logic
+            if (route === 'work-detail' && id) {
+                renderWorkDetail(id);
+            } else if (route === 'checkout') {
+                renderCheckout();
             }
 
-            // 取得每日總額度上限
-            let dailyLimit = 2;
-            const { data: exactLimitData } = await supabaseClient.from('daily_limits').select('max_limit').eq('date', startDateStr).single();
-            if (exactLimitData) {
-              dailyLimit = exactLimitData.max_limit;
-            } else {
-              const { data: ruleData, error: ruleErr } = await supabaseClient
-                .from('default_limits')
-                .select('max_limit')
-                .lte('effective_date', startDateStr)
-                .order('effective_date', { ascending: false })
-                .limit(1);
-
-              if (!ruleErr && ruleData && ruleData.length > 0) {
-                dailyLimit = ruleData[0].max_limit;
-              }
-            }
-
-            if (!isAdmin) {
-              const { data: existingBookings, error: checkError } = await supabaseClient
-                .from('bookings')
-                .select('booking_id')
-                .gte('injection_time', startDateStr + 'T00:00:00')
-                .lte('injection_time', startDateStr + 'T23:59:59')
-                .neq('status', 'Cancelled');
-
-              if (!checkError && existingBookings && existingBookings.length >= dailyLimit) {
-                return Swal.fire({ 
-                  icon: 'warning', 
-                  title: '額度已滿', 
-                  text: `該日期 (${startDateStr}) 的總預約已達上限（當日最多 ${dailyLimit} 個），無法再新增！` 
-                });
-              }
-            }
-
-            let targetCenterCode = currentUser.dept_code;
-            if (isAdmin) {
-              const { value: inputCenter } = await Swal.fire({
-                title: '幫哪個 Center 代約？',
-                input: 'text',
-                inputPlaceholder: '請輸入代號 (例如 AH)',
-                showCancelButton: true
-              });
-              if (!inputCenter) return;
-              targetCenterCode = inputCenter.trim().toUpperCase();
-            }
-
-            const { data: center, error: centerErr } = await supabaseClient.from('centers').select('center_id').eq('center_code', targetCenterCode).single();
-            if (centerErr || !center) return Swal.fire({ icon: 'error', title: '查無資料', text: `找不到代號為 "${targetCenterCode}" 的中心資料` });
-
-            // 檢查：每個 Center 同一日不能預約超過 1 個 Case，除非登入者是 UNE
-            if (currentUser.dept_code !== 'UNE') {
-              const { data: centerExistingBookings, error: centerCheckErr } = await supabaseClient
-                .from('bookings')
-                .select('booking_id')
-                .eq('center_id', center.center_id)
-                .gte('injection_time', startDateStr + 'T00:00:00')
-                .lte('injection_time', startDateStr + 'T23:59:59')
-                .neq('status', 'Cancelled');
-
-              if (!centerCheckErr && centerExistingBookings && centerExistingBookings.length > 0) {
-                return Swal.fire({ 
-                  icon: 'warning', 
-                  title: '預約限制', 
-                  text: `${targetCenterCode} 在該日期 (${startDateStr}) 已經有一個預約案子。\n\n每個中心每日限預約 1 個 Case（如需加約請聯絡 UNE 協助代約）！` 
-                });
-              }
-            }
-
-            // 選擇藥物
-            const { value: prodName } = await Swal.fire({
-              title: '請選擇預約藥物',
-              input: 'radio',
-              inputOptions: {
-                'C-11 Acetate': '💊 C-11 Acetate',
-                'F-18 PSMA-1007': '💊 F-18 PSMA-1007'
-              },
-              showCancelButton: true
-            });
-            if (!prodName) return;
-
-            const { data: prod, error: prodErr } = await supabaseClient.from('products').select('product_id').ilike('product_name', `%${prodName}%`).single();
-            if (prodErr || !prod) return Swal.fire({ icon: 'error', title: '系統錯誤', text: '找不到對應的藥物資料' });
-            
-            const bookingDateTime = startDateStr + 'T11:00:00';
-
-            const { error: insertErr } = await supabaseClient.from('bookings').insert([{ 
-              center_id: center.center_id, 
-              product_id: prod.product_id, 
-              injection_time: bookingDateTime, 
-              status: 'Pending' 
-            }]);
-
-            if (insertErr) {
-              Swal.fire({ icon: 'error', title: '預約失敗', text: insertErr.message });
-            } else { 
-              Swal.fire({ icon: 'success', title: '預約成功', text: `已成功為 [${targetCenterCode}] 於 ${startDateStr} 建立預約！`, timer: 2000, showConfirmButton: false }); 
-              calendar.refetchEvents(); 
-            }
-          }
+            // Close mobile menu and scroll to top
+            if (isMobileMenuOpen) toggleMobileMenu();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-      });
-      calendar.render();
-    });
-  </script>
+
+        // Initialize App
+        window.onload = () => {
+            renderGrids();
+            updateCartBadge();
+        };
+    </script>
 </body>
 </html>
