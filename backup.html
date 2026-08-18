@@ -17,7 +17,6 @@
             background-color: #0071e3;
             color: white;
         }
-        /* Smooth Apple-like Fade In Animation */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
@@ -27,12 +26,10 @@
         }
         .delay-100 { animation-delay: 100ms; }
         .delay-200 { animation-delay: 200ms; }
-        /* Clean minimalist scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #86868b; }
-        /* Hide views by default */
         .view { display: none; }
         .view.active { display: block; }
     </style>
@@ -41,17 +38,14 @@
     <!-- Navigation -->
     <nav class="fixed top-0 w-full z-50 bg-[#fbfbfd]/80 backdrop-blur-xl border-b border-[#d2d2d7]/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-            <!-- Logo -->
             <button onclick="navigate('home')" class="text-xl font-semibold tracking-tight hover:opacity-70 transition-opacity flex items-center">
                J.Law's Synthesis Lab
             </button>
-            <!-- Desktop Links -->
             <div class="hidden md:flex items-center space-x-8 text-xs font-medium tracking-wide text-[#1d1d1f]">
                 <button onclick="navigate('works')" class="nav-link hover:text-[#0071e3] transition-colors" data-target="works">Artifacts</button>
                 <button onclick="navigate('about')" class="nav-link hover:text-[#0071e3] transition-colors" data-target="about">About</button>
                 <button onclick="navigate('contact')" class="nav-link hover:text-[#0071e3] transition-colors" data-target="contact">Contact</button>
             </div>
-            <!-- Bag & Mobile Toggle -->
             <div class="flex items-center space-x-4 text-[#1d1d1f]">
                 <button onclick="navigate('checkout')" class="relative group p-2 -m-2 hover:text-[#0071e3] transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
@@ -63,13 +57,13 @@
                 </button>
             </div>
         </div>
-        <!-- Mobile Menu Dropdown -->
         <div id="mobile-menu" class="hidden md:hidden absolute top-14 left-0 w-full bg-[#fbfbfd] border-b border-[#d2d2d7]/50 px-6 py-6 flex flex-col space-y-4 shadow-lg">
             <button onclick="navigate('works')" class="text-left text-2xl font-semibold tracking-tight">Artifacts</button>
             <button onclick="navigate('about')" class="text-left text-2xl font-semibold tracking-tight">About</button>
             <button onclick="navigate('contact')" class="text-left text-2xl font-semibold tracking-tight">Contact</button>
         </div>
     </nav>
+
     <main class="pt-14 min-h-[calc(100vh-80px)]">
         <!-- VIEW: HOME -->
         <div id="view-home" class="view active">
@@ -110,6 +104,7 @@
                 </section>
             </div>
         </div>
+
         <!-- VIEW: WORKS -->
         <div id="view-works" class="view">
             <div class="pt-24 pb-24 px-6 max-w-7xl mx-auto animate-fade-in opacity-0">
@@ -122,6 +117,7 @@
                 </div>
             </div>
         </div>
+
         <!-- VIEW: WORK DETAIL -->
         <div id="view-work-detail" class="view">
             <div class="pt-20 pb-24 px-6 max-w-6xl mx-auto animate-fade-in opacity-0">
@@ -134,6 +130,7 @@
                 </div>
             </div>
         </div>
+
         <!-- VIEW: CHECKOUT -->
         <div id="view-checkout" class="view">
             <div class="pt-24 pb-24 px-6 max-w-4xl mx-auto animate-fade-in opacity-0">
@@ -143,6 +140,7 @@
                 </div>
             </div>
         </div>
+
         <!-- VIEW: SUCCESS -->
         <div id="view-success" class="view">
             <div class="pt-32 pb-24 px-6 max-w-2xl mx-auto text-center animate-fade-in opacity-0">
@@ -150,7 +148,7 @@
                 <p class="text-xl text-[#86868b] mb-12 font-medium">
                     Your transaction is complete. A receipt and download links have been sent to your email.
                 </p>
-               
+              
                 <div class="bg-white p-8 rounded-[2.5rem] shadow-[0_4px_24px_rgb(0,0,0,0.04)] mb-12">
                     <h3 class="text-xl font-semibold tracking-tight mb-6 text-left">Your Downloads</h3>
                     <div class="space-y-4">
@@ -167,22 +165,21 @@
                 </button>
             </div>
         </div>
-<!-- VIEW: ABOUT -->
-<div id="view-about" class="view">
-    <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
-        <h1 class="text-5xl md:text-6xl font-semibold tracking-tight mb-8">About.</h1>
-       
-        <!-- 英文副標（字體較小、較淡） -->
-        <p class="text-[#86868b] text-sm md:text-base font-medium mb-8 tracking-wide uppercase opacity-80">
-            Scientist, life-hacker, and digital curator. Built for exploration, optimized for curiosity.
-        </p>
-        <!-- 中文主內文 -->
-        <p class="text-[#86868b] text-xl font-medium mb-16 leading-relaxed">
-            <span class="block text-slate-900 font-semibold mb-3">科學家、生活駭客與數碼資產管理人。</span>
-            歡迎來到我的私人合成實驗室：這裏是專注於探索程式、語言學習、效率工具與模組化知識系統的基地。為探索而建，為好奇心而優化。
-        </p>
-    </div>
-</div>
+
+        <!-- VIEW: ABOUT -->
+        <div id="view-about" class="view">
+            <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
+                <h1 class="text-5xl md:text-6xl font-semibold tracking-tight mb-8">About.</h1>
+                <p class="text-[#86868b] text-sm md:text-base font-medium mb-8 tracking-wide uppercase opacity-80">
+                    Scientist, life-hacker, and digital curator. Built for exploration, optimized for curiosity.
+                </p>
+                <p class="text-[#86868b] text-xl font-medium mb-16 leading-relaxed">
+                    <span class="block text-slate-900 font-semibold mb-3">科學家、生活駭客與數碼資產管理人。</span>
+                    歡迎來到我的私人合成實驗室：這裏是專注於探索程式、語言學習、效率工具與模組化知識系統的基地。為探索而建，為好奇心而優化。
+                </p>
+            </div>
+        </div>
+
         <!-- VIEW: CONTACT -->
         <div id="view-contact" class="view">
             <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
@@ -207,6 +204,7 @@
             </div>
         </div>
     </main>
+
     <!-- Footer -->
     <footer class="bg-[#f5f5f7] border-t border-[#d2d2d7]/50 py-10 px-6">
         <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-xs text-[#86868b] font-medium">
@@ -220,119 +218,129 @@
             </div>
         </div>
     </footer>
+
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-8 right-8 bg-[#1d1d1f]/90 backdrop-blur-lg text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 z-50 animate-fade-in font-medium hidden">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         <p id="toast-message" class="text-sm">Message</p>
     </div>
 
-    <!-- Image Lightbox -->
-    <div id="lightbox" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 cursor-pointer" onclick="closeLightbox()">
-        <img id="lightbox-img" src="" alt="Full size" class="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain" onclick="event.stopPropagation()">
-        <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white/80 hover:text-white transition-colors">
+    <!-- Image / Video Lightbox -->
+    <div id="lightbox" class="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4 cursor-pointer" onclick="closeLightbox()">
+        <!-- 圖片模式 -->
+        <img id="lightbox-img" src="" alt="Full size" class="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain hidden" onclick="event.stopPropagation()">
+        
+        <!-- 影片模式 -->
+        <div id="lightbox-video-wrapper" class="hidden w-full max-w-5xl aspect-video rounded-2xl overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
+            <iframe id="lightbox-video" class="w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+
+        <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white/80 hover:text-white transition-colors z-10">
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
     </div>
+
     <!-- Scripts -->
     <script>
         // --- MOCK DATA ---
-       const MOCK_WORKS = [
-{
-        id: 'w1',
-        title: 'J.Law Mindmap',
-        category: 'Laboratory Architecture',
-        fullDescription: `
-            <span class="block text-slate-900 font-medium text-sm mb-1">An expanding, centralized map of projects, tools, and curiosities.</span>
-            <span class="block text-slate-600 text-sm mb-1">一張不斷擴展的專案、工具與好奇心中心化地圖。</span>
-            <span class="block text-slate-400 text-xs">プロジェクト、ツール、好奇心の中心的なマップ。</span>`,
-        image: 'images/mindmap/mindmap.png',
-        tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear'],
-// ↓↓↓ 加這段就行 ↓↓↓
-  features: [
-    {
-      image: 'images/mindmap.png',          // 左邊的圖
-      title: 'Interconnected Thinking',     // 標題
-      desc: '用視覺化方式把想法、專案、工具全部連起來。'  // 說明
-    },
-    {
-      image: 'images/mindmap.png',
-      title: 'Modular System',
-      desc: '每個節點都可以獨立擴展，方便持續迭代。'
-    },
-    {
-      image: 'images/mindmap.png',
-      title: 'Multi-language Support',
-      desc: '同時支援中文、英文、日文標註。'
-    },
-    {
-      image: 'images/mindmap.png',
-      title: 'Living Document',
-      desc: '不是靜態圖，而是會隨時間成長的知識架構。'
-    },
-    {
-      image: 'images/mindmap.png',
-      title: 'Lab Gear Ready',
-      desc: '專為個人實驗室設計的工具與知識管理系統。'
-    }
-  ]
+        const MOCK_WORKS = [
+            {
+    id: 'w1',
+    title: 'J.Law Mindmap',
+    category: 'Laboratory Architecture',
+    fullDescription: `
+        <span class="block text-slate-900 font-medium text-sm mb-1">EN: An expanding, centralized map of projects, tools, and curiosities.</span>
+        <span class="block text-slate-600 text-sm mb-1">CN: 一張不斷擴展的專案、工具與好奇心中心化地圖。</span>
+        <span class="block text-slate-400 text-xs">JP: プロジェクト、ツール、好奇心の中心的なマップ。</span>
+    `,
+    image: 'images/mindmap/mindmap.png',
+    tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear'],
+    features: [
+        {
+            image: 'https://www.youtube.com/watch?v=z5DWJ7aw5xg&list=PLLH8KFU5iGKXeNQFV0wV6kDBSyQfEsvfc&index=20',
+            title: 'Interconnected Thinking',
+            desc: '用視覺化方式把想法、專案、工具全部連起來。'
+        },
+        {
+            image: 'images/mindmap.png',
+            title: 'Modular System',
+            desc: '每個節點都可以獨立擴展，方便持續迭代。'
+        },
+        {
+            image: 'images/mindmap.png',
+            title: 'Multi-language Support',
+            desc: '同時支援中文、英文、日文標註。'
+        },
+        {
+            image: 'images/mindmap.png',
+            title: 'Living Document',
+            desc: '不是靜態圖，而是會隨時間成長的知識架構。'
+        },
+        {
+            image: 'images/mindmap.png',
+            title: 'Lab Gear Ready',
+            desc: '專為個人實驗室設計的工具與知識管理系統。'
+        }
+    ]
 },
-    {
-        id: 'w2',
-        title: 'Python & Data Pipeline Kit',
-        category: 'Digital Tools',
-        description: 'Streamlined scripts and automation templates.<br>用於數據分析與工作流優化的精簡腳本。<br>データ分析とワークフロー最適化のためのスクリプト。',
-        fullDescription: 'EN: Modular Python scripts built to eliminate repetitive tasks.<br>CN: 旨在消除重複性任務的模組化 Python 腳本與自動化工具。<br>JP: 定型作業を排除するために構築されたモジュール式Pythonスクリプト。',
-        details: '在這裡加入詳細說明。',
-        image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Python', 'Automation', 'Data']
-    },
-    {
-        id: 'w3',
-        title: 'JLPT & Language Acquisition Guides',
-        category: 'Learning Systems',
-        description: 'Structured grammar frameworks for self-directed learners.<br>針對自學者優化的結構化文法與語言框架。<br>独学者向けの構造化された文法と語彙フレームワーク。',
-        fullDescription: 'EN: Advanced Japanese language acquisition matrices and sentence synthesis templates.<br>CN: 進階日語習得矩陣與句子合成模板。<br>JP: 高度な日本語習得マトリックスと文脈合成テンプレート。',
-        details: '在這裡加入詳細說明。',
-        image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Japanese', 'JLPT', 'Education']
-    },
-    {
-        id: 'w4',
-        title: 'Linux / Ubuntu Terminal Configs',
-        category: 'Configurations',
-        description: 'Clean dotfiles and system optimization setups.<br>打造極致開發環境的乾淨 dotfiles 與配置。<br>開発環境のためのクリーンなドットファイルと設定。',
-        fullDescription: 'EN: Shell scripts designed for a frictionless developer workspace.<br>CN: 為無摩擦開發工作區設計的 Shell 自動化腳本。<br>JP: スムーズな開発ワークスペース用のシェルスクリプト。',
-        details: '在這裡加入詳細說明。',
-        image: 'https://images.unsplash.com/photo-1629654297299-c8506221ca97?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Linux', 'Terminal', 'Dotfiles']
-    },
-    {
-        id: 'w5',
-        title: 'Modular PKM Notion Workspace',
-        category: 'Template',
-        description: 'A dark-mode, system-driven workspace.<br>專為知識管理與數位資產設計的系統化工作區。<br>知識管理とデジタル資産のためのシステムワークスペース。',
-        fullDescription: 'EN: Keep your digital life synchronized with custom databases.<br>CN: 使用自訂資料庫同步你的數位生活與研究筆記。<br>JP: カスタムデータベースでデジタルライフを同期。',
-        details: '在這裡加入詳細說明。',
-        image: 'https://images.unsplash.com/photo-1542435503-956c469947f6?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Notion', 'Productivity', 'PKM']
-    },
-    {
-        id: 'w6',
-        title: 'Efficiency & Scripting Toolkit',
-        category: 'Toolkit',
-        description: 'Micro-tools and automation scripts for life-hackers.<br>專為現代生活駭客設計的微型工具與自動化合集。<br>ライフハッカーのためのマイクロツールと自動化スクリプト。',
-        fullDescription: 'EN: Optimized for speed, reliability, and minimal resource usage.<br>CN: 以速度、可靠性與最低資源消耗為核心進行優化。<br>JP: スピード、信頼性、最小限のリソース使用量に最適化。',
-        details: '在這裡加入詳細說明。',
-        image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1000&auto=format&fit=crop',
-        tags: ['Tools', 'Scripts', 'Efficiency']
-    }
-];
+            {
+                id: 'w2',
+                title: 'Python & Data Pipeline Kit',
+                category: 'Digital Tools',
+                description: 'Streamlined scripts and automation templates.<br>用於數據分析與工作流優化的精簡腳本。<br>データ分析とワークフロー最適化のためのスクリプト。',
+                fullDescription: 'EN: Modular Python scripts built to eliminate repetitive tasks.<br>CN: 旨在消除重複性任務的模組化 Python 腳本與自動化工具。<br>JP: 定型作業を排除するために構築されたモジュール式Pythonスクリプト。',
+                details: '在這裡加入詳細說明。',
+                image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Python', 'Automation', 'Data']
+            },
+            {
+                id: 'w3',
+                title: 'JLPT & Language Acquisition Guides',
+                category: 'Learning Systems',
+                description: 'Structured grammar frameworks for self-directed learners.<br>針對自學者優化的結構化文法與語言框架。<br>独学者向けの構造化された文法と語彙フレームワーク。',
+                fullDescription: 'EN: Advanced Japanese language acquisition matrices and sentence synthesis templates.<br>CN: 進階日語習得矩陣與句子合成模板。<br>JP: 高度な日本語習得マトリックスと文脈合成テンプレート。',
+                details: '在這裡加入詳細說明。',
+                image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Japanese', 'JLPT', 'Education']
+            },
+            {
+                id: 'w4',
+                title: 'Linux / Ubuntu Terminal Configs',
+                category: 'Configurations',
+                description: 'Clean dotfiles and system optimization setups.<br>打造極致開發環境的乾淨 dotfiles 與配置。<br>開発環境のためのクリーンなドットファイルと設定。',
+                fullDescription: 'EN: Shell scripts designed for a frictionless developer workspace.<br>CN: 為無摩擦開發工作區設計的 Shell 自動化腳本。<br>JP: スムーズな開発ワークスペース用のシェルスクリプト。',
+                details: '在這裡加入詳細說明。',
+                image: 'https://images.unsplash.com/photo-1629654297299-c8506221ca97?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Linux', 'Terminal', 'Dotfiles']
+            },
+            {
+                id: 'w5',
+                title: 'Modular PKM Notion Workspace',
+                category: 'Template',
+                description: 'A dark-mode, system-driven workspace.<br>專為知識管理與數位資產設計的系統化工作區。<br>知識管理とデジタル資産のためのシステムワークスペース。',
+                fullDescription: 'EN: Keep your digital life synchronized with custom databases.<br>CN: 使用自訂資料庫同步你的數位生活與研究筆記。<br>JP: カスタムデータベースでデジタルライフを同期。',
+                details: '在這裡加入詳細說明。',
+                image: 'https://images.unsplash.com/photo-1542435503-956c469947f6?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Notion', 'Productivity', 'PKM']
+            },
+            {
+                id: 'w6',
+                title: 'Efficiency & Scripting Toolkit',
+                category: 'Toolkit',
+                description: 'Micro-tools and automation scripts for life-hackers.<br>專為現代生活駭客設計的微型工具與自動化合集。<br>ライフハッカーのためのマイクロツールと自動化スクリプト。',
+                fullDescription: 'EN: Optimized for speed, reliability, and minimal resource usage.<br>CN: 以速度、可靠性與最低資源消耗為核心進行優化。<br>JP: スピード、信頼性、最小限のリソース使用量に最適化。',
+                details: '在這裡加入詳細說明。',
+                image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1000&auto=format&fit=crop',
+                tags: ['Tools', 'Scripts', 'Efficiency']
+            }
+        ];
+
         // --- STATE ---
         let cart = [];
         let isMobileMenuOpen = false;
         let toastTimeout;
+
         // --- CORE FUNCTIONS ---
-        // Generate HTML for a work card
         function createWorkCardHTML(work, index) {
             const delayClass = index % 3 === 0 ? '' : index % 3 === 1 ? 'delay-100' : 'delay-200';
             return `
@@ -351,18 +359,26 @@
                 </div>
             `;
         }
-        // Render works on specific grids
+
         function renderGrids() {
             document.getElementById('home-works-grid').innerHTML = MOCK_WORKS.slice(0, 3).map(createWorkCardHTML).join('');
             document.getElementById('all-works-grid').innerHTML = MOCK_WORKS.map(createWorkCardHTML).join('');
         }
-        // Render work detail page
+
         function renderWorkDetail(workId) {
             const work = MOCK_WORKS.find(w => w.id === workId);
             if (!work) return;
+
             const tagsHTML = work.tags.map(tag => `<span class="text-xs font-medium text-[#515154] bg-[#f5f5f7] px-3 py-1.5 rounded-full border border-[#d2d2d7]/50">${tag}</span>`).join('');
 
-            // Feature cards data (可之後改成從 work.features 讀取)
+            // 取得 YouTube ID
+            function getYoutubeId(url) {
+                if (!url) return null;
+                const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+                const match = url.match(regExp);
+                return match ? match[1] : null;
+            }
+
             const featureCards = work.features || [
                 { image: work.image, title: 'Feature 1', desc: '在這裡加入這個功能的詳細說明。' },
                 { image: work.image, title: 'Feature 2', desc: '在這裡加入這個功能的詳細說明。' },
@@ -371,20 +387,44 @@
                 { image: work.image, title: 'Feature 5', desc: '在這裡加入這個功能的詳細說明。' }
             ];
 
-            const featuresHTML = featureCards.map(f => `
-                <div class="flex flex-col sm:flex-row gap-6 p-5 bg-white rounded-[1.5rem] shadow-[0_4px_24px_rgb(0,0,0,0.03)] border border-[#d2d2d7]/40 items-center">
-                    <div class="w-full sm:w-40 h-40 shrink-0 rounded-2xl overflow-hidden bg-[#f5f5f7] cursor-pointer hover:opacity-90 transition-opacity" onclick="openLightbox('${f.image}')">
-                        <img src="${f.image}" alt="${f.title}" class="w-full h-full object-cover">
+            const featuresHTML = featureCards.map(f => {
+                const ytId = getYoutubeId(f.image);
+                let mediaHTML = '';
+
+                if (ytId) {
+                    // YouTube：顯示縮圖 + 播放按鈕，點擊開啟大型播放器
+                    const thumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                    mediaHTML = `
+                        <div class="w-full sm:w-56 aspect-video shrink-0 rounded-2xl overflow-hidden bg-black relative cursor-pointer group" onclick="openVideoLightbox('${ytId}')">
+                            <img src="${thumb}" alt="${f.title}" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity">
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="w-14 h-14 bg-red-600 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // 普通圖片
+                    mediaHTML = `
+                        <div class="w-full sm:w-40 h-40 shrink-0 rounded-2xl overflow-hidden bg-[#f5f5f7] cursor-pointer hover:opacity-90 transition-opacity" onclick="openLightbox('${f.image}')">
+                            <img src="${f.image}" alt="${f.title}" class="w-full h-full object-cover">
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="flex flex-col sm:flex-row gap-6 p-5 bg-white rounded-[1.5rem] shadow-[0_4px_24px_rgb(0,0,0,0.03)] border border-[#d2d2d7]/40 items-center">
+                        ${mediaHTML}
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold tracking-tight text-[#1d1d1f] mb-2">${f.title}</h3>
+                            <p class="text-[#515154] text-base leading-relaxed">${f.desc}</p>
+                        </div>
                     </div>
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold tracking-tight text-[#1d1d1f] mb-2">${f.title}</h3>
-                        <p class="text-[#515154] text-base leading-relaxed">${f.desc}</p>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             document.getElementById('work-detail-content').innerHTML = `
-                <!-- 主產品區：左圖右說明（兩邊都 sticky） -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start mb-20">
                     <div class="relative aspect-square bg-white rounded-[2.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-[#d2d2d7]/30 lg:sticky lg:top-24 cursor-pointer" onclick="openLightbox('${work.image}')">
                         <img src="${work.image}" alt="${work.title}" class="w-full h-full object-cover">
@@ -403,8 +443,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- 下方 Feature 卡片區 -->
                 <div class="border-t border-[#d2d2d7]/50 pt-16">
                     <h2 class="text-2xl font-semibold tracking-tight text-[#1d1d1f] mb-8">Features</h2>
                     <div class="space-y-6">
@@ -413,10 +451,10 @@
                 </div>
             `;
         }
-        // Render checkout page
+
         function renderCheckout() {
             const container = document.getElementById('checkout-content');
-           
+          
             if (cart.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-20 bg-white rounded-[2rem] shadow-[0_4px_24px_rgb(0,0,0,0.02)]">
@@ -427,7 +465,7 @@
                 `;
                 return;
             }
-           
+          
             const itemsHTML = cart.map(item => `
                 <div class="flex gap-6 p-6 bg-white rounded-[2rem] shadow-[0_4px_24px_rgb(0,0,0,0.02)] items-center">
                     <div class="w-24 h-24 shrink-0 rounded-2xl overflow-hidden bg-[#f5f5f7]">
@@ -444,6 +482,7 @@
                     </div>
                 </div>
             `).join('');
+
             container.innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
                     <div class="lg:col-span-2 space-y-6">${itemsHTML}</div>
@@ -462,6 +501,7 @@
                 </div>
             `;
         }
+
         // Cart Actions
         function addToCart(workId) {
             const work = MOCK_WORKS.find(w => w.id === workId);
@@ -473,16 +513,19 @@
                 showToast(`"${work.title}" is already in your bag.`);
             }
         }
+
         function removeFromCart(workId) {
             cart = cart.filter(item => item.id !== workId);
             renderCheckout();
             updateCartBadge();
         }
+
         function processCheckout() {
             cart = [];
             updateCartBadge();
             navigate('success');
         }
+
         function updateCartBadge() {
             const badge = document.getElementById('cart-badge');
             if (cart.length > 0) {
@@ -494,37 +537,71 @@
                 badge.classList.remove('flex');
             }
         }
-        // UI Helpers
+
+        // Lightbox 相關
         function openLightbox(src) {
             const lightbox = document.getElementById('lightbox');
-            document.getElementById('lightbox-img').src = src;
+            const img = document.getElementById('lightbox-img');
+            const videoWrapper = document.getElementById('lightbox-video-wrapper');
+            const video = document.getElementById('lightbox-video');
+
+            // 切換到圖片模式
+            img.src = src;
+            img.classList.remove('hidden');
+            videoWrapper.classList.add('hidden');
+            video.src = ''; // 清空影片
+
             lightbox.classList.remove('hidden');
             lightbox.classList.add('flex');
             document.body.style.overflow = 'hidden';
         }
+
+        function openVideoLightbox(ytId) {
+            const lightbox = document.getElementById('lightbox');
+            const img = document.getElementById('lightbox-img');
+            const videoWrapper = document.getElementById('lightbox-video-wrapper');
+            const video = document.getElementById('lightbox-video');
+
+            // 切換到影片模式
+            img.classList.add('hidden');
+            videoWrapper.classList.remove('hidden');
+            video.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`;
+
+            lightbox.classList.remove('hidden');
+            lightbox.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+
         function closeLightbox() {
             const lightbox = document.getElementById('lightbox');
+            const video = document.getElementById('lightbox-video');
+
             lightbox.classList.add('hidden');
             lightbox.classList.remove('flex');
             document.body.style.overflow = '';
+
+            // 停止影片播放
+            video.src = '';
         }
+
         function showToast(message) {
             const toast = document.getElementById('toast');
             document.getElementById('toast-message').innerText = message;
-           
+          
             toast.classList.remove('hidden');
-           
+          
             clearTimeout(toastTimeout);
             toastTimeout = setTimeout(() => {
                 toast.classList.add('hidden');
             }, 3000);
         }
+
         function toggleMobileMenu() {
             isMobileMenuOpen = !isMobileMenuOpen;
             const menu = document.getElementById('mobile-menu');
             const iconOpen = document.getElementById('menu-icon-open');
             const iconClose = document.getElementById('menu-icon-close');
-           
+          
             if (isMobileMenuOpen) {
                 menu.classList.remove('hidden');
                 iconOpen.classList.add('hidden');
@@ -535,19 +612,19 @@
                 iconClose.classList.add('hidden');
             }
         }
+
         function handleContactSubmit(event) {
             event.preventDefault();
             showToast("Message sent successfully.");
             event.target.reset();
         }
+
         // Navigation
         function navigate(route, id = null) {
-            // Hide all views
             document.querySelectorAll('.view').forEach(el => {
                 el.classList.remove('active');
             });
-           
-            // Update active nav link styles
+          
             document.querySelectorAll('.nav-link').forEach(el => {
                 if(el.dataset.target === route) {
                     el.classList.add('text-[#0071e3]');
@@ -555,30 +632,30 @@
                     el.classList.remove('text-[#0071e3]');
                 }
             });
-            // Show target view
+
             const targetView = document.getElementById('view-' + route);
             if (targetView) {
                 targetView.classList.add('active');
-               
-                // Re-trigger fade in animation
+              
                 const animatedContent = targetView.querySelector('.animate-fade-in');
                 if (animatedContent) {
                     animatedContent.style.animation = 'none';
-                    animatedContent.offsetHeight; /* trigger reflow */
+                    animatedContent.offsetHeight;
                     animatedContent.style.animation = null;
                 }
             }
-            // Handle specific view logic
+
             if (route === 'work-detail' && id) {
                 renderWorkDetail(id);
             } else if (route === 'checkout') {
                 renderCheckout();
             }
-            // Close mobile menu and scroll to top
+
             if (isMobileMenuOpen) toggleMobileMenu();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        // Initialize App
+
+        // Initialize
         window.onload = () => {
             renderGrids();
             updateCartBadge();
