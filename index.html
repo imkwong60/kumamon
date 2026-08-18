@@ -63,7 +63,6 @@
             <button onclick="navigate('contact')" class="text-left text-2xl font-semibold tracking-tight">Contact</button>
         </div>
     </nav>
-
     <main class="pt-14 min-h-[calc(100vh-80px)]">
         <!-- VIEW: HOME -->
         <div id="view-home" class="view active">
@@ -104,7 +103,6 @@
                 </section>
             </div>
         </div>
-
         <!-- VIEW: WORKS -->
         <div id="view-works" class="view">
             <div class="pt-24 pb-24 px-6 max-w-7xl mx-auto animate-fade-in opacity-0">
@@ -117,7 +115,6 @@
                 </div>
             </div>
         </div>
-
         <!-- VIEW: WORK DETAIL -->
         <div id="view-work-detail" class="view">
             <div class="pt-20 pb-24 px-6 max-w-6xl mx-auto animate-fade-in opacity-0">
@@ -130,7 +127,6 @@
                 </div>
             </div>
         </div>
-
         <!-- VIEW: CHECKOUT -->
         <div id="view-checkout" class="view">
             <div class="pt-24 pb-24 px-6 max-w-4xl mx-auto animate-fade-in opacity-0">
@@ -140,7 +136,6 @@
                 </div>
             </div>
         </div>
-
         <!-- VIEW: SUCCESS -->
         <div id="view-success" class="view">
             <div class="pt-32 pb-24 px-6 max-w-2xl mx-auto text-center animate-fade-in opacity-0">
@@ -148,7 +143,7 @@
                 <p class="text-xl text-[#86868b] mb-12 font-medium">
                     Your transaction is complete. A receipt and download links have been sent to your email.
                 </p>
-              
+             
                 <div class="bg-white p-8 rounded-[2.5rem] shadow-[0_4px_24px_rgb(0,0,0,0.04)] mb-12">
                     <h3 class="text-xl font-semibold tracking-tight mb-6 text-left">Your Downloads</h3>
                     <div class="space-y-4">
@@ -165,7 +160,6 @@
                 </button>
             </div>
         </div>
-
         <!-- VIEW: ABOUT -->
         <div id="view-about" class="view">
             <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
@@ -179,7 +173,6 @@
                 </p>
             </div>
         </div>
-
         <!-- VIEW: CONTACT -->
         <div id="view-contact" class="view">
             <div class="pt-32 pb-24 px-6 max-w-3xl mx-auto text-center animate-fade-in opacity-0">
@@ -204,7 +197,6 @@
             </div>
         </div>
     </main>
-
     <!-- Footer -->
     <footer class="bg-[#f5f5f7] border-t border-[#d2d2d7]/50 py-10 px-6">
         <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-xs text-[#86868b] font-medium">
@@ -218,123 +210,112 @@
             </div>
         </div>
     </footer>
-
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-8 right-8 bg-[#1d1d1f]/90 backdrop-blur-lg text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 z-50 animate-fade-in font-medium hidden">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         <p id="toast-message" class="text-sm">Message</p>
     </div>
-
     <!-- Image / Video Lightbox -->
     <div id="lightbox" class="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4 cursor-pointer" onclick="closeLightbox()">
-        <!-- 圖片模式 -->
         <img id="lightbox-img" src="" alt="Full size" class="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain hidden" onclick="event.stopPropagation()">
-        
-        <!-- 影片模式 -->
         <div id="lightbox-video-wrapper" class="hidden w-full max-w-5xl aspect-video rounded-2xl overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
             <iframe id="lightbox-video" class="w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
         </div>
-
         <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white/80 hover:text-white transition-colors z-10">
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
     </div>
-
     <!-- Scripts -->
     <script>
         // --- MOCK DATA ---
         const MOCK_WORKS = [
             {
-    id: 'w1',
-    title: 'J.Law Mindmap',
-    category: 'Laboratory Architecture',
-    fullDescription: `
-        <span class="block text-slate-900 font-medium text-sm mb-1">A beautiful mind-mapping tool to organize ideas effortlessly. Features auto-layout and web export to keep your thoughts structured and shareable.</span>
-        <span class="block text-slate-600 text-sm mb-1">超美的心智圖工具，輕鬆整理靈感，還能一鍵排版並匯出成網頁，是整理思緒的好幫手。</span>
-        <span class="block text-slate-400 text-xs">直感的に使える美しいマインドマップツール。アイデアを簡単に整理し、ワンクリックで整列や保存ができる思考整理の味方です。</span>
-    `,
-    image: 'images/mindmap/mindmap.png',
-    tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear'],
-    features: [
-        {
-            image: 'https://www.youtube.com/watch?v=z5DWJ7aw5xg&list=PLLH8KFU5iGKXeNQFV0wV6kDBSyQfEsvfc&index=20',
-            title: '玻璃質感介面',
-            desc: '採用舒適的視覺設計與柔和配色，在整理思緒時也能擁有愉悅的視覺享受。'
-        },
-        {
-            image: 'images/mindmap.png',
-            title: 'Modular System',
-            desc: '每個節點都可以獨立擴展，方便持續迭代。'
-        },
-        {
-            image: 'images/mindmap.png',
-            title: '一鍵自動整理排版',
-            desc: '點擊一下按鈕，所有混亂的節點就會自動排列得整整齊齊。'
-        },
-        {
-            image: 'images/mindmap.png',
-            title: '自由跨節點連結',
-            desc: '除了基本的階層關係，你還能隨意連接不同的想法，展現複雜且細膩的思維關聯。'
-        },
-        {
-            image: 'images/mindmap.png',
-            title: '深淺色模式切換',
-            desc: '提供深色與淺色兩款主題，在不同的光線環境下都能舒適地進行思考。'
-        },
-		{
-            image: 'images/mindmap.png',
-            title: '匯出獨立網頁檔案',
-            desc: '可以轉存成一個獨立的網頁，不需安裝任何軟體就能隨時用瀏覽器開啟。'
-        }
-    ]
-},
+                id: 'w1',
+                title: 'J.Law Mindmap',
+                category: 'Laboratory Architecture',
+                fullDescription: `
+                    <span class="block text-slate-900 font-medium text-sm mb-1">A beautiful mind-mapping tool to organize ideas effortlessly. Features auto-layout and web export to keep your thoughts structured and shareable.</span>
+                    <span class="block text-slate-600 text-sm mb-1">超美的心智圖工具，輕鬆整理靈感，還能一鍵排版並匯出成網頁，是整理思緒的好幫手。</span>
+                    <span class="block text-slate-400 text-xs">直感的に使える美しいマインドマップツール。アイデアを簡単に整理し、ワンクリックで整列や保存ができる思考整理の味方です。</span>
+                `,
+                image: 'images/mindmap/mindmap.png',
+                tags: ['Mindmap', 'Ideas Architecture', 'Lab Gear'],
+                features: [
+                    {
+                        image: 'https://www.youtube.com/watch?v=z5DWJ7aw5xg&list=PLLH8KFU5iGKXeNQFV0wV6kDBSyQfEsvfc&index=20',
+                        title: '玻璃質感介面',
+                        desc: '採用舒適的視覺設計與柔和配色，在整理思緒時也能擁有愉悅的視覺享受。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: 'Modular System',
+                        desc: '每個節點都可以獨立擴展，方便持續迭代。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: '一鍵自動整理排版',
+                        desc: '點擊一下按鈕，所有混亂的節點就會自動排列得整整齊齊。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: '自由跨節點連結',
+                        desc: '除了基本的階層關係，你還能隨意連接不同的想法，展現複雜且細膩的思維關聯。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: '深淺色模式切換',
+                        desc: '提供深色與淺色兩款主題，在不同的光線環境下都能舒適地進行思考。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: '匯出獨立網頁檔案',
+                        desc: '可以轉存成一個獨立的網頁，不需安裝任何軟體就能隨時用瀏覽器開啟。'
+                    }
+                ]
+            },
             {
                 id: 'w2',
                 title: '投資組合管理追蹤',
                 category: 'Laboratory Architecture',
                 fullDescription: `
-        <span class="block text-slate-900 font-medium text-sm mb-1">Easily manage portfolios with real-time updates and AI-powered insights.</span>
-        <span class="block text-slate-600 text-sm mb-1">一眼看清全球投資盈虧，更有 AI 提供專業建議。</span>
-        <span class="block text-slate-400 text-xs">株や債券の損益を把握し、AIが投資をサポートします。</span>
-                image: 'https://github.com/imkwong60/personalweb/blob/main/images/profolio/profo.png',
+                    <span class="block text-slate-900 font-medium text-sm mb-1">Easily manage portfolios with real-time updates and AI-powered insights.</span>
+                    <span class="block text-slate-600 text-sm mb-1">一眼看清全球投資盈虧，更有 AI 提供專業建議。</span>
+                    <span class="block text-slate-400 text-xs">株や債券の損益を把握し、AIが投資をサポートします。</span>
+                `,
+                image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1000&auto=format&fit=crop',
                 tags: ['Life hacker', 'Wealth management', 'Data'],
-				features: [
-        {
-            image: 'https://www.youtube.com/watch?v=z5DWJ7aw5xg&list=PLLH8KFU5iGKXeNQFV0wV6kDBSyQfEsvfc&index=20',
-            title: '資產總覽看板。快速搜尋過濾',
-            desc: '一眼看懂所有投資的總價值與盈虧，隨時掌握財富增長。。'
-        },
-        {
-            image: 'images/mindmap.png',
-            title: '跨市場支援',
-            desc: '同時管理港股、美股與債券，全球配置一清二楚。'
-        },
-        {
-            image: 'images/mindmap.png',
-            title: 'AI 投資顧問',
-            desc: '內建 AI 助理，能分析持倉風險並提供專業的調整建議。'
-        },
-        {
-            image: 'images/mindmap.png',
-            title: '即時匯率換算。一鍵更新現價',
-            desc: '自動更新美金與港幣匯率，即時反映投資收益。。'
-        },
-        {
-            image: 'images/mindmap.png',
-            title: '債券到期管理',
-            desc: '專門記錄債券到期日，幫助您提早規劃領息後的資金去向。。'
-        }
-		{
-            image: 'images/mindmap.png',
-            title: '安全資料備份',
-            desc: '除了本金損益，還能記錄已收到的股息，算帳更精確。'
-        }
-    ]
-				
-				
-				
-				
-				
+                features: [
+                    {
+                        image: 'https://www.youtube.com/watch?v=z5DWJ7aw5xg&list=PLLH8KFU5iGKXeNQFV0wV6kDBSyQfEsvfc&index=20',
+                        title: '資產總覽看板・快速搜尋過濾',
+                        desc: '一眼看懂所有投資的總價值與盈虧，隨時掌握財富增長。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: '跨市場支援',
+                        desc: '同時管理港股、美股與債券，全球配置一清二楚。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: 'AI 投資顧問',
+                        desc: '內建 AI 助理，能分析持倉風險並提供專業的調整建議。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: '即時匯率換算・一鍵更新現價',
+                        desc: '自動更新美金與港幣匯率，即時反映投資收益。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: '債券到期管理',
+                        desc: '專門記錄債券到期日，幫助您提早規劃領息後的資金去向。'
+                    },
+                    {
+                        image: 'images/mindmap.png',
+                        title: '安全資料備份',
+                        desc: '除了本金損益，還能記錄已收到的股息，算帳更精確。'
+                    }
+                ]
             },
             {
                 id: 'w3',
@@ -411,10 +392,8 @@
         function renderWorkDetail(workId) {
             const work = MOCK_WORKS.find(w => w.id === workId);
             if (!work) return;
-
             const tagsHTML = work.tags.map(tag => `<span class="text-xs font-medium text-[#515154] bg-[#f5f5f7] px-3 py-1.5 rounded-full border border-[#d2d2d7]/50">${tag}</span>`).join('');
-
-            // 取得 YouTube ID
+            
             function getYoutubeId(url) {
                 if (!url) return null;
                 const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
@@ -433,9 +412,7 @@
             const featuresHTML = featureCards.map(f => {
                 const ytId = getYoutubeId(f.image);
                 let mediaHTML = '';
-
                 if (ytId) {
-                    // YouTube：顯示縮圖 + 播放按鈕，點擊開啟大型播放器
                     const thumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
                     mediaHTML = `
                         <div class="w-full sm:w-56 aspect-video shrink-0 rounded-2xl overflow-hidden bg-black relative cursor-pointer group" onclick="openVideoLightbox('${ytId}')">
@@ -448,14 +425,12 @@
                         </div>
                     `;
                 } else {
-                    // 普通圖片
                     mediaHTML = `
                         <div class="w-full sm:w-40 h-40 shrink-0 rounded-2xl overflow-hidden bg-[#f5f5f7] cursor-pointer hover:opacity-90 transition-opacity" onclick="openLightbox('${f.image}')">
                             <img src="${f.image}" alt="${f.title}" class="w-full h-full object-cover">
                         </div>
                     `;
                 }
-
                 return `
                     <div class="flex flex-col sm:flex-row gap-6 p-5 bg-white rounded-[1.5rem] shadow-[0_4px_24px_rgb(0,0,0,0.03)] border border-[#d2d2d7]/40 items-center">
                         ${mediaHTML}
@@ -497,7 +472,7 @@
 
         function renderCheckout() {
             const container = document.getElementById('checkout-content');
-          
+         
             if (cart.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-20 bg-white rounded-[2rem] shadow-[0_4px_24px_rgb(0,0,0,0.02)]">
@@ -508,7 +483,7 @@
                 `;
                 return;
             }
-          
+         
             const itemsHTML = cart.map(item => `
                 <div class="flex gap-6 p-6 bg-white rounded-[2rem] shadow-[0_4px_24px_rgb(0,0,0,0.02)] items-center">
                     <div class="w-24 h-24 shrink-0 rounded-2xl overflow-hidden bg-[#f5f5f7]">
@@ -581,19 +556,16 @@
             }
         }
 
-        // Lightbox 相關
+        // Lightbox
         function openLightbox(src) {
             const lightbox = document.getElementById('lightbox');
             const img = document.getElementById('lightbox-img');
             const videoWrapper = document.getElementById('lightbox-video-wrapper');
             const video = document.getElementById('lightbox-video');
-
-            // 切換到圖片模式
             img.src = src;
             img.classList.remove('hidden');
             videoWrapper.classList.add('hidden');
-            video.src = ''; // 清空影片
-
+            video.src = '';
             lightbox.classList.remove('hidden');
             lightbox.classList.add('flex');
             document.body.style.overflow = 'hidden';
@@ -604,12 +576,9 @@
             const img = document.getElementById('lightbox-img');
             const videoWrapper = document.getElementById('lightbox-video-wrapper');
             const video = document.getElementById('lightbox-video');
-
-            // 切換到影片模式
             img.classList.add('hidden');
             videoWrapper.classList.remove('hidden');
             video.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`;
-
             lightbox.classList.remove('hidden');
             lightbox.classList.add('flex');
             document.body.style.overflow = 'hidden';
@@ -618,21 +587,16 @@
         function closeLightbox() {
             const lightbox = document.getElementById('lightbox');
             const video = document.getElementById('lightbox-video');
-
             lightbox.classList.add('hidden');
             lightbox.classList.remove('flex');
             document.body.style.overflow = '';
-
-            // 停止影片播放
             video.src = '';
         }
 
         function showToast(message) {
             const toast = document.getElementById('toast');
             document.getElementById('toast-message').innerText = message;
-          
             toast.classList.remove('hidden');
-          
             clearTimeout(toastTimeout);
             toastTimeout = setTimeout(() => {
                 toast.classList.add('hidden');
@@ -644,7 +608,7 @@
             const menu = document.getElementById('mobile-menu');
             const iconOpen = document.getElementById('menu-icon-open');
             const iconClose = document.getElementById('menu-icon-close');
-          
+         
             if (isMobileMenuOpen) {
                 menu.classList.remove('hidden');
                 iconOpen.classList.add('hidden');
@@ -667,7 +631,7 @@
             document.querySelectorAll('.view').forEach(el => {
                 el.classList.remove('active');
             });
-          
+         
             document.querySelectorAll('.nav-link').forEach(el => {
                 if(el.dataset.target === route) {
                     el.classList.add('text-[#0071e3]');
@@ -679,7 +643,7 @@
             const targetView = document.getElementById('view-' + route);
             if (targetView) {
                 targetView.classList.add('active');
-              
+             
                 const animatedContent = targetView.querySelector('.animate-fade-in');
                 if (animatedContent) {
                     animatedContent.style.animation = 'none';
