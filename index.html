@@ -1647,11 +1647,6 @@
                 }
             };
 
-            // 自己 push 後 Realtime 回傳時用來略過（避免回聲）
-            const lastPushTsRef = useRef(null);
-            const realtimeChannelRef = useRef(null);
-            const pullingRef = useRef(false);
-
             const pushCloud = async () => {
                 const sb = getSb();
                 if (!sb || !navigator.onLine) {
@@ -1680,7 +1675,6 @@
                     const { error } = await sb.from('notepad_data').upsert(payload, { onConflict: 'id' });
                     if (error) throw error;
                     setLocalModified(localTs);
-                    lastPushTsRef.current = localTs;
                     setSyncStatus('已同步雲端');
                 } catch (e) {
                     console.warn('cloud push', e);
@@ -1694,146 +1688,9 @@
                 cloudTimer.current = setTimeout(() => { pushCloud(); }, 600);
             };
 
-            // 從雲端拉並依時間戳協調（供初次載入、Realtime、回到前景使用）
-            // options.silent：背景更新時若雲端較新則直接套用（不彈窗）；有本機更新中則略過
-            // options.promptIfCloudNewer：雲端較新時彈衝突視窗（初次開啟用）
-            const pullAndReconcile = async (options = {}) => {
-                const { silent = false, promptIfCloudNewer = false } = options;
-                const sb = getSb();
-                if (!sb || !navigator.onLine || pullingRef.current) return { ok: false };
-                if (cloudConflictPending.current && silent) return { ok: false, reason: 'conflict_pending' };
-                pullingRef.current = true;
-                try {
-                    const { data, error } = await sb.from('notepad_data').select('data, updated_at').eq('id', CLOUD_ROW_ID).maybeSingle();
-                    if (error) throw error;
-                    const cloudHasData = !!(data && data.data && (
-                        Array.isArray(data.data.transactions)
-                        || Array.isArray(data.data.diningRecords)
-                        || Array.isArray(data.data.travelRecords)
-                        || Array.isArray(data.data.buySellItems)
-                    ));
-                    if (!cloudHasData) {
-                        return { ok: true, action: 'empty' };
-                    }
-                    const cloudUpdatedAt = data.updated_at || (data.data && data.data.updatedAt) || null;
-                    const localUpdatedAt = getLocalModified();
-                    const localTime = localUpdatedAt ? new Date(localUpdatedAt).getTime() : NaN;
-                    const cloudTime = cloudUpdatedAt ? new Date(cloudUpdatedAt).getTime() : NaN;
-
-                    // 自己剛 push 的回聲：雲端時間與 lastPush 相同或極接近 → 略過
-                    if (lastPushTsRef.current && cloudUpdatedAt) {
-                        const pushT = new Date(lastPushTsRef.current).getTime();
-                        if (!isNaN(pushT) && !isNaN(cloudTime) && Math.abs(cloudTime - pushT) < 2500) {
-                            return { ok: true, action: 'echo' };
-                        }
-                    }
-
-                    // 本機無時間戳或本機無資料 → 直接採用
-                    const localSnap = readLocalDataSnapshot();
-                    const localHas = hasAnyLocalRecords(localSnap);
-                    if (!localHas) {
-                        applyCloudPayload(data.data, cloudUpdatedAt);
-                        setSyncStatus('已從雲端載入');
-                        if (silent) showToast('已從雲端更新');
-                        return { ok: true, action: 'applied' };
-                    }
-
-                    // 本機較新或同等 → 不覆蓋
-                    if (!isNaN(localTime) && !isNaN(cloudTime) && localTime >= cloudTime) {
-                        return { ok: true, action: 'local_newer' };
-                    }
-
-                    // 雲端較新
-                    if (promptIfCloudNewer) {
-                        setSyncStatus('發現雲端較新版本');
-                        cloudConflictPending.current = true;
-                        const cloudDataRef = data.data;
-                        const cloudTsRef = cloudUpdatedAt;
-                        setConfirmAction({
-                            title: '雲端資料較新',
-                            message: '雲端備份比本機新。\n\n「採用雲端」會以雲端覆蓋本機；\n「保留本機並上傳」會把目前本機資料推上雲端。\n\n（關閉視窗則暫不變更，本機資料會保留）',
-                            confirmText: '採用雲端',
-                            altConfirmText: '保留本機並上傳',
-                            isDanger: false,
-                            onConfirm: () => {
-                                applyCloudPayload(cloudDataRef, cloudTsRef);
-                                cloudConflictPending.current = false;
-                                setSyncStatus('已從雲端載入');
-                                showToast('已採用雲端資料');
-                            },
-                            onAltConfirm: () => {
-                                touchLocalModified();
-                                cloudConflictPending.current = false;
-                                setSyncStatus('本機 · 上傳中…');
-                                setTimeout(() => pushCloud(), 300);
-                                showToast('已保留本機，正在上傳');
-                            }
-                        });
-                        return { ok: true, action: 'prompted' };
-                    }
-
-                    // silent：背景即時更新 — 直接套用雲端（本機已同步過或較舊）
-                    if (silent && !cloudConflictPending.current) {
-                        applyCloudPayload(data.data, cloudUpdatedAt);
-                        setSyncStatus('已從雲端更新');
-                        showToast('雲端有更新，已同步到本機');
-                        return { ok: true, action: 'applied_silent' };
-                    }
-
-                    return { ok: true, action: 'cloud_newer_skipped' };
-                } catch (e) {
-                    console.warn('pullAndReconcile', e);
-                    return { ok: false, error: e };
-                } finally {
-                    pullingRef.current = false;
-                }
-            };
-
             // FIX(P0-1): 初次從雲端拉時比對 updatedAt，禁止靜默覆蓋本機
-            // + Realtime 訂閱 + 回到前景時再拉一次
             useEffect(() => {
                 let cancelled = false;
-                let channel = null;
-
-                const setupRealtime = (sb) => {
-                    try {
-                        if (realtimeChannelRef.current) {
-                            try { sb.removeChannel(realtimeChannelRef.current); } catch (_) {}
-                            realtimeChannelRef.current = null;
-                        }
-                        channel = sb.channel('kumamon-notepad-' + CLOUD_ROW_ID)
-                            .on(
-                                'postgres_changes',
-                                {
-                                    event: '*',
-                                    schema: 'public',
-                                    table: 'notepad_data',
-                                    filter: 'id=eq.' + CLOUD_ROW_ID
-                                },
-                                (payload) => {
-                                    if (cancelled || cloudConflictPending.current) return;
-                                    // 自己的 push 回聲會在 pullAndReconcile 內用 lastPushTs 略過
-                                    // Realtime payload 可能已含 new row；仍統一走 pull 以取得完整 data
-                                    pullAndReconcile({ silent: true }).then((r) => {
-                                        if (r && r.action === 'applied_silent') {
-                                            // toast 已在函式內
-                                        }
-                                    });
-                                }
-                            )
-                            .subscribe((status) => {
-                                if (status === 'SUBSCRIBED') {
-                                    console.info('[Kumamon] Realtime subscribed');
-                                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                                    console.warn('[Kumamon] Realtime status', status);
-                                }
-                            });
-                        realtimeChannelRef.current = channel;
-                    } catch (e) {
-                        console.warn('Realtime setup failed', e);
-                    }
-                };
-
                 (async () => {
                     const sb = getSb();
                     if (!sb || !navigator.onLine) {
@@ -1855,9 +1712,7 @@
 
                         if (!cloudHasData) {
                             setSyncStatus('本機 · 待上傳');
-                            cloudReady.current = true;
                             setTimeout(() => pushCloud(), 800);
-                            setupRealtime(sb);
                             return;
                         }
 
@@ -1866,90 +1721,65 @@
                         const localHas = hasAnyLocalRecords(localSnap);
                         const localUpdatedAt = localSnap.updatedAt;
 
+                        // 本機無資料 → 直接採用雲端
                         if (!localHas) {
                             applyCloudPayload(data.data, cloudUpdatedAt);
                             setSyncStatus('已從雲端載入');
-                        } else {
-                            const localTime = localUpdatedAt ? new Date(localUpdatedAt).getTime() : NaN;
-                            const cloudTime = cloudUpdatedAt ? new Date(cloudUpdatedAt).getTime() : NaN;
-                            const localIsNewerOrEqual = !isNaN(localTime) && !isNaN(cloudTime) && localTime >= cloudTime;
-
-                            if (localIsNewerOrEqual) {
-                                setSyncStatus('本機較新 · 上傳中…');
-                                setTimeout(() => pushCloud(), 800);
-                            } else {
-                                setSyncStatus('發現雲端較新版本');
-                                cloudConflictPending.current = true;
-                                const cloudDataRef = data.data;
-                                const cloudTsRef = cloudUpdatedAt;
-                                setConfirmAction({
-                                    title: '雲端資料較新',
-                                    message: '雲端備份比本機新。\n\n「採用雲端」會以雲端覆蓋本機；\n「保留本機並上傳」會把目前本機資料推上雲端。\n\n（關閉視窗則暫不變更，本機資料會保留）',
-                                    confirmText: '採用雲端',
-                                    altConfirmText: '保留本機並上傳',
-                                    isDanger: false,
-                                    onConfirm: () => {
-                                        applyCloudPayload(cloudDataRef, cloudTsRef);
-                                        cloudConflictPending.current = false;
-                                        setSyncStatus('已從雲端載入');
-                                        showToast('已採用雲端資料');
-                                    },
-                                    onAltConfirm: () => {
-                                        touchLocalModified();
-                                        cloudConflictPending.current = false;
-                                        setSyncStatus('本機 · 上傳中…');
-                                        setTimeout(() => pushCloud(), 300);
-                                        showToast('已保留本機，正在上傳');
-                                    }
-                                });
-                            }
+                            return;
                         }
+
+                        const localTime = localUpdatedAt ? new Date(localUpdatedAt).getTime() : NaN;
+                        const cloudTime = cloudUpdatedAt ? new Date(cloudUpdatedAt).getTime() : NaN;
+                        const localIsNewerOrEqual = !isNaN(localTime) && !isNaN(cloudTime) && localTime >= cloudTime;
+
+                        // 本機較新（或同等）→ 不覆蓋，改上傳本機
+                        if (localIsNewerOrEqual) {
+                            setSyncStatus('本機較新 · 上傳中…');
+                            setTimeout(() => pushCloud(), 800);
+                            return;
+                        }
+
+                        // 雲端較新，或無法判定時間戳 → 詢問使用者，禁止靜默覆蓋
+                        setSyncStatus('發現雲端較新版本');
+                        cloudConflictPending.current = true;
+                        const cloudDataRef = data.data;
+                        const cloudTsRef = cloudUpdatedAt;
+                        setConfirmAction({
+                            title: '雲端資料較新',
+                            message: '雲端備份比本機新。\n\n「採用雲端」會以雲端覆蓋本機；\n「保留本機並上傳」會把目前本機資料推上雲端。\n\n（關閉視窗則暫不變更，本機資料會保留）',
+                            confirmText: '採用雲端',
+                            altConfirmText: '保留本機並上傳',
+                            isDanger: false,
+                            onConfirm: () => {
+                                applyCloudPayload(cloudDataRef, cloudTsRef);
+                                cloudConflictPending.current = false;
+                                setSyncStatus('已從雲端載入');
+                                showToast('已採用雲端資料');
+                            },
+                            onAltConfirm: () => {
+                                // 強制把本機 last-modified 推到 now，避免推上去的 updated_at 仍舊於雲端
+                                touchLocalModified();
+                                cloudConflictPending.current = false;
+                                setSyncStatus('本機 · 上傳中…');
+                                setTimeout(() => pushCloud(), 300);
+                                showToast('已保留本機，正在上傳');
+                            }
+                        });
                     } catch (e) {
                         console.warn('cloud pull', e);
                         if (!cancelled) setSyncStatus('本機模式');
                     } finally {
                         cloudReady.current = true;
-                        if (!cancelled) {
-                            const sb2 = getSb();
-                            if (sb2 && navigator.onLine) setupRealtime(sb2);
-                        }
                     }
                 })();
-
-                const onOnline = () => {
-                    setSyncStatus('連線中…');
-                    // 先拉雲端再視需要推
-                    pullAndReconcile({ silent: true }).finally(() => scheduleCloud());
-                    const sb = getSb();
-                    if (sb) setupRealtime(sb);
-                };
+                const onOnline = () => { setSyncStatus('連線中…'); scheduleCloud(); };
                 const onOffline = () => setSyncStatus('離線');
-                // PWA 回到前景時再拉一次（Realtime 斷線時的備援）
-                const onVisibility = () => {
-                    if (document.visibilityState === 'visible' && navigator.onLine && cloudReady.current) {
-                        pullAndReconcile({ silent: true });
-                    }
-                };
-                const onFocus = () => {
-                    if (navigator.onLine && cloudReady.current) {
-                        pullAndReconcile({ silent: true });
-                    }
-                };
                 window.addEventListener('online', onOnline);
                 window.addEventListener('offline', onOffline);
-                document.addEventListener('visibilitychange', onVisibility);
-                window.addEventListener('focus', onFocus);
                 return () => {
                     cancelled = true;
                     window.removeEventListener('online', onOnline);
                     window.removeEventListener('offline', onOffline);
-                    document.removeEventListener('visibilitychange', onVisibility);
-                    window.removeEventListener('focus', onFocus);
-                    const sb = getSb();
-                    if (sb && realtimeChannelRef.current) {
-                        try { sb.removeChannel(realtimeChannelRef.current); } catch (_) {}
-                        realtimeChannelRef.current = null;
-                    }
                 };
             }, []);
 
@@ -2948,7 +2778,7 @@
                             <div className="flex items-center gap-1">
                                 {/* FIX(P1-6): 接上「匯出含資料 HTML」UI */}
                                 <button onClick={handleExportJson} title="匯出 JSON" aria-label="匯出 JSON" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.Export /></button>
-                    
+                                <button onClick={handleExportHtml} title="匯出含資料的 HTML" aria-label="匯出含資料的 HTML" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.FileDown /></button>
                                 <button onClick={handleImportClick} title="匯入 JSON" aria-label="匯入 JSON" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.Import /></button>
                                 <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
                                 <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1"></div>
