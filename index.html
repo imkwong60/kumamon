@@ -1318,6 +1318,29 @@
             const [travelRecords, setTravelRecords] = useLocalStorage('expense-tracker-travel-v1', []);
             const [buySellItems, setBuySellItems] = useLocalStorage('expense-tracker-buysell-v1', []);
             const [mainTab, setMainTab] = useState('general'); // general | dining | travel | buysell
+            const MAIN_TABS = ['general', 'dining', 'travel', 'buysell'];
+            const swipeStart = useRef(null);
+            const onSwipeStart = (e) => {
+                const t = e.touches && e.touches[0];
+                if (!t) return;
+                swipeStart.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+            };
+            const onSwipeEnd = (e) => {
+                const start = swipeStart.current;
+                swipeStart.current = null;
+                if (!start) return;
+                const t = e.changedTouches && e.changedTouches[0];
+                if (!t) return;
+                const dx = t.clientX - start.x;
+                const dy = t.clientY - start.y;
+                // 水平為主、距離夠、時間唔好太長，先換分頁
+                if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+                if (Date.now() - start.t > 800) return;
+                const idx = MAIN_TABS.indexOf(mainTab);
+                if (idx < 0) return;
+                if (dx < 0 && idx < MAIN_TABS.length - 1) setMainTab(MAIN_TABS[idx + 1]); // 左滑 → 下一個
+                if (dx > 0 && idx > 0) setMainTab(MAIN_TABS[idx - 1]); // 右滑 → 上一個
+            };
             const [diningSearch, setDiningSearch] = useState('');
             const [diningFilterCuisine, setDiningFilterCuisine] = useState('all');
             const [diningFilterMonth, setDiningFilterMonth] = useState('all');
@@ -2159,7 +2182,9 @@
                         </div>
                     </div>
 
-                    <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+                    <main className="max-w-3xl mx-auto px-4 py-6 space-y-6"
+                        onTouchStart={onSwipeStart}
+                        onTouchEnd={onSwipeEnd}>
                         {mainTab === 'dining' ? (
                             <>
                                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm">
