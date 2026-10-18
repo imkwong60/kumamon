@@ -371,6 +371,7 @@
             Chart: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>,
             Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>,
             // 檔案下載圖示（匯出完整 HTML）
+            FileDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 18 15 15"></polyline></svg>,
             Calc: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line></svg>
         };
 
@@ -1591,11 +1592,6 @@
             const cloudTimer = useRef(null);
             // FIX(P0-1): 雲端衝突待使用者選擇時，暫停自動 push，避免覆蓋較新雲端
             const cloudConflictPending = useRef(false);
-            // 即時同步：略過自己刚推上去的回聲；記錄已套用的雲端時間
-            const pushingRef = useRef(false);
-            const lastAppliedCloudTs = useRef(null);
-            const cloudChannelRef = useRef(null);
-            const uiBusyRef = useRef(false);
 
             // FIX(P0-1): 套用雲端 payload 到本機 state，並寫入 last-modified
             // applyingCloudRef：標記「這次 state 變更來自雲端」，避免 data effect 再 touchLocalModified / 清衝突
@@ -1649,7 +1645,6 @@
                 } catch (e) {
                     console.warn('applyCloudPayload sync flush failed', e);
                 }
-                lastAppliedCloudTs.current = ts;
             };
 
             const pushCloud = async () => {
@@ -1658,15 +1653,7 @@
                     setSyncStatus(navigator.onLine ? '本機' : '離線');
                     return;
                 }
-                if (cloudConflictPending.current) return;
-                if (uiBusyRef.current) {
-                    clearTimeout(cloudTimer.current);
-                    cloudTimer.current = setTimeout(() => { pushCloud(); }, 5000);
-                    setSyncStatus('輸入中 · 稍後同步');
-                    return;
-                }
                 try {
-                    pushingRef.current = true;
                     setSyncStatus('同步中…');
                     // FIX(P0-1): push 時用本機 last-modified（若無則補上）
                     const localTs = getLocalModified() || touchLocalModified();
@@ -1688,68 +1675,22 @@
                     const { error } = await sb.from('notepad_data').upsert(payload, { onConflict: 'id' });
                     if (error) throw error;
                     setLocalModified(localTs);
-                    lastAppliedCloudTs.current = localTs;
                     setSyncStatus('已同步雲端');
                 } catch (e) {
                     console.warn('cloud push', e);
                     setSyncStatus('本機已存（雲端失敗）');
-                } finally {
-                    // 稍延遲再關，避免 realtime 回聲搶在 finally 後立刻套用
-                    setTimeout(() => { pushingRef.current = false; }, 800);
                 }
             };
 
             const scheduleCloud = () => {
                 if (!cloudReady.current || cloudConflictPending.current) return;
                 clearTimeout(cloudTimer.current);
-                const delay = uiBusyRef.current ? 12000 : 8000;
-                setSyncStatus(uiBusyRef.current ? '輸入中 · 稍後同步' : '待上傳…');
-                cloudTimer.current = setTimeout(() => {
-                    if (uiBusyRef.current) {
-                        scheduleCloud();
-                        return;
-                    }
-                    pushCloud();
-                }, delay);
+                cloudTimer.current = setTimeout(() => { pushCloud(); }, 600);
             };
 
-            // 從雲端列套用（即時／前景拉取共用）；僅當雲端較新且無衝突等待
-            const tryApplyRemoteRow = (row) => {
-                if (!row || cloudConflictPending.current || pushingRef.current || uiBusyRef.current) return false;
-                const cloudData = row.data;
-                if (!cloudData || typeof cloudData !== 'object') return false;
-                const cloudUpdatedAt = row.updated_at || cloudData.updatedAt || null;
-                if (cloudUpdatedAt && lastAppliedCloudTs.current && String(cloudUpdatedAt) === String(lastAppliedCloudTs.current)) {
-                    return false; // 自己推上去的回聲
-                }
-                const localUpdatedAt = getLocalModified();
-                const localTime = localUpdatedAt ? new Date(localUpdatedAt).getTime() : NaN;
-                const cloudTime = cloudUpdatedAt ? new Date(cloudUpdatedAt).getTime() : NaN;
-                if (!isNaN(localTime) && !isNaN(cloudTime) && cloudTime <= localTime) {
-                    return false; // 本機同等或較新，不覆蓋
-                }
-                applyCloudPayload(cloudData, cloudUpdatedAt);
-                // 静默同步：只更新狀態列，不弹 toast（避免轮询／焦点反复打扰）
-                setSyncStatus('已即時同步');
-                return true;
-            };
-
-            const softPullCloud = async () => {
-                const sb = getSb();
-                if (!sb || !navigator.onLine || cloudConflictPending.current || pushingRef.current || uiBusyRef.current) return;
-                try {
-                    const { data, error } = await sb.from('notepad_data').select('data, updated_at').eq('id', CLOUD_ROW_ID).maybeSingle();
-                    if (error) throw error;
-                    if (data) tryApplyRemoteRow(data);
-                } catch (e) {
-                    console.warn('soft pull', e);
-                }
-            };
-
-            // FIX(P0-1): 初次從雲端拉時比對 updatedAt；之後訂閱 Realtime + 前景／定時拉取
+            // FIX(P0-1): 初次從雲端拉時比對 updatedAt，禁止靜默覆蓋本機
             useEffect(() => {
                 let cancelled = false;
-                let pollTimer = null;
                 (async () => {
                     const sb = getSb();
                     if (!sb || !navigator.onLine) {
@@ -1783,7 +1724,7 @@
                         // 本機無資料 → 直接採用雲端
                         if (!localHas) {
                             applyCloudPayload(data.data, cloudUpdatedAt);
-                            setSyncStatus('已從雲端載入 · 即時同步中');
+                            setSyncStatus('已從雲端載入');
                             return;
                         }
 
@@ -1793,7 +1734,6 @@
 
                         // 本機較新（或同等）→ 不覆蓋，改上傳本機
                         if (localIsNewerOrEqual) {
-                            lastAppliedCloudTs.current = localUpdatedAt || cloudUpdatedAt;
                             setSyncStatus('本機較新 · 上傳中…');
                             setTimeout(() => pushCloud(), 800);
                             return;
@@ -1813,10 +1753,11 @@
                             onConfirm: () => {
                                 applyCloudPayload(cloudDataRef, cloudTsRef);
                                 cloudConflictPending.current = false;
-                                setSyncStatus('已從雲端載入 · 即時同步中');
+                                setSyncStatus('已從雲端載入');
                                 showToast('已採用雲端資料');
                             },
                             onAltConfirm: () => {
+                                // 強制把本機 last-modified 推到 now，避免推上去的 updated_at 仍舊於雲端
                                 touchLocalModified();
                                 cloudConflictPending.current = false;
                                 setSyncStatus('本機 · 上傳中…');
@@ -1829,74 +1770,20 @@
                         if (!cancelled) setSyncStatus('本機模式');
                     } finally {
                         cloudReady.current = true;
-                        if (cancelled) return;
-                        const sb2 = getSb();
-                        if (!sb2) return;
-
-                        // Supabase Realtime：其他裝置寫入時即時套用
-                        try {
-                            if (cloudChannelRef.current) {
-                                try { sb2.removeChannel(cloudChannelRef.current); } catch (_) {}
-                            }
-                            const channel = sb2.channel('kumamon-live-' + CLOUD_ROW_ID)
-                                .on('postgres_changes', {
-                                    event: '*',
-                                    schema: 'public',
-                                    table: 'notepad_data',
-                                    filter: 'id=eq.' + CLOUD_ROW_ID
-                                }, (payload) => {
-                                    if (cancelled) return;
-                                    const row = payload.new || payload.record;
-                                    if (!row) return;
-                                    tryApplyRemoteRow(row);
-                                })
-                                .subscribe((status) => {
-                                    if (status === 'SUBSCRIBED') {
-                                        console.info('[Kumamon] realtime subscribed');
-                                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                                        console.warn('[Kumamon] realtime status', status);
-                                    }
-                                });
-                            cloudChannelRef.current = channel;
-                        } catch (re) {
-                            console.warn('realtime subscribe failed', re);
-                        }
-
-                        // 後備：回到前景時拉取；每 25 秒輪詢一次（Realtime 未開表也能同步）
-                        pollTimer = setInterval(() => {
-                            if (document.visibilityState === 'visible') softPullCloud();
-                        }, 25000);
                     }
                 })();
-
-                const onOnline = () => { setSyncStatus('連線中…'); scheduleCloud(); softPullCloud(); };
+                const onOnline = () => { setSyncStatus('連線中…'); scheduleCloud(); };
                 const onOffline = () => setSyncStatus('離線');
-                const onVisible = () => {
-                    if (document.visibilityState === 'visible') {
-                        softPullCloud();
-                    }
-                };
                 window.addEventListener('online', onOnline);
                 window.addEventListener('offline', onOffline);
-                document.addEventListener('visibilitychange', onVisible);
-                window.addEventListener('focus', onVisible);
-
                 return () => {
                     cancelled = true;
                     window.removeEventListener('online', onOnline);
                     window.removeEventListener('offline', onOffline);
-                    document.removeEventListener('visibilitychange', onVisible);
-                    window.removeEventListener('focus', onVisible);
-                    if (pollTimer) clearInterval(pollTimer);
-                    const sb = getSb();
-                    if (sb && cloudChannelRef.current) {
-                        try { sb.removeChannel(cloudChannelRef.current); } catch (_) {}
-                        cloudChannelRef.current = null;
-                    }
                 };
             }, []);
 
-                        // FIX(P0-1)+Bug2: 僅帳本／設定變更才 touchLocalModified；theme 變更不碰 lastModified
+            // FIX(P0-1)+Bug2: 僅帳本／設定變更才 touchLocalModified；theme 變更不碰 lastModified
             // （否則衝突取消後切主題再刷新，本機會被誤判較新而覆蓋雲端）
             // - 來自 applyCloudPayload：不 touch、不自動 push
             // - 衝突等待中：不清 pending；pending 只由彈窗按鈕清除
@@ -1937,23 +1824,6 @@
             const [embeddedImport, setEmbeddedImport] = useState(null);
             const [toast, setToast] = useState(null);
             const fileInputRef = useRef(null);
-
-            // 表單／對話框開關 → 更新忙碌旗標；關閉後再補上傳
-            useEffect(() => {
-                const busy = !!(
-                    isFormOpen || isDiningFormOpen || isTravelFormOpen || isBuySellFormOpen ||
-                    isSettingsOpen || isRecurringListOpen || confirmAction || importData || embeddedImport
-                );
-                const wasBusy = uiBusyRef.current;
-                uiBusyRef.current = busy;
-                if (wasBusy && !busy && cloudReady.current && !cloudConflictPending.current) {
-                    clearTimeout(cloudTimer.current);
-                    setSyncStatus('待上傳…');
-                    cloudTimer.current = setTimeout(() => {
-                        if (!uiBusyRef.current) pushCloud();
-                    }, 2500);
-                }
-            }, [isFormOpen, isDiningFormOpen, isTravelFormOpen, isBuySellFormOpen, isSettingsOpen, isRecurringListOpen, confirmAction, importData, embeddedImport]);
 
             // FIX(P0-2): 掛載時檢查是否有待處理的嵌入備份
             useEffect(() => {
@@ -2547,7 +2417,138 @@
 
             // 匯出「含完整資料」的 HTML
             // FIX(P1-7): 匯出前清空 #root；驗證改為 parse 嵌入 JSON 比對筆數
-            const handleImportClick = () => fileInputRef.current?.click();
+            const handleExportHtml = () => {
+                try {
+                    const embedded = {
+                        transactions,
+                        diningRecords,
+                        travelRecords,
+                        buySellItems,
+                        settings,
+                        categories,
+                        theme,
+                        exportedAt: new Date().toISOString()
+                    };
+                    const dataJson = JSON.stringify(embedded)
+                        .replace(/</g, '\\u003c')
+                        .replace(/\u2028/g, '\\u2028')
+                        .replace(/\u2029/g, '\\u2029');
+
+                    const newScriptBody =
+                        '\n        // __EMBEDDED_DATA_START__\n' +
+                        '        window.__EMBEDDED_DATA__ = ' + dataJson + ';\n' +
+                        '        // __EMBEDDED_DATA_END__\n    ';
+
+                    let holder = document.getElementById('__embedded_data_holder__');
+                    if (!holder) {
+                        holder = Array.from(document.querySelectorAll('script')).find(s => {
+                            const t = s.textContent || '';
+                            return t.includes('__EMBEDDED_DATA_START__') && !t.includes('handleExportHtml');
+                        });
+                    }
+
+                    let htmlContent;
+                    if (holder) {
+                        const originalText = holder.textContent;
+                        holder.textContent = newScriptBody;
+                        htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+                        holder.textContent = originalText; // 立刻還原，不影響當前頁
+                    } else {
+                        htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+                        const needle = 'window.__EMBEDDED_DATA__ = null;';
+                        const pos = htmlContent.indexOf(needle);
+                        if (pos !== -1) {
+                            htmlContent = htmlContent.slice(0, pos) +
+                                'window.__EMBEDDED_DATA__ = ' + dataJson + ';' +
+                                htmlContent.slice(pos + needle.length);
+                        } else {
+                            htmlContent = htmlContent.replace(
+                                /<\/body>/i,
+                                '<script id="__embedded_data_holder__">window.__EMBEDDED_DATA__ = ' + dataJson + ';<\/script></body>'
+                            );
+                        }
+                    }
+
+                    // 序列化後清空 #root 內容（字串層），避免把 React 渲染結果寫進檔案
+                    htmlContent = htmlContent.replace(
+                        /(<div id="root"[^>]*>)[\s\S]*(<\/div>\s*<script)/i,
+                        '$1$2'
+                    );
+
+                    // 驗證：抽出嵌入 JSON 並比對各帳本筆數
+                    let verified = false;
+                    try {
+                        const startMark = 'window.__EMBEDDED_DATA__ = ';
+                        const endMark = '// __EMBEDDED_DATA_END__';
+                        let sPos = htmlContent.indexOf(startMark);
+                        let ePos = htmlContent.indexOf(endMark, sPos);
+                        let jsonStr = null;
+                        if (sPos !== -1 && ePos !== -1) {
+                            jsonStr = htmlContent.slice(sPos + startMark.length, ePos).trim();
+                            if (jsonStr.endsWith(';')) jsonStr = jsonStr.slice(0, -1).trim();
+                        } else if (sPos !== -1) {
+                            // 後備：從賦值起 parse（JSON.parse 會吃完整 object）
+                            const from = sPos + startMark.length;
+                            // 找第一個 { 到匹配的 }
+                            const brace = htmlContent.indexOf('{', from);
+                            if (brace !== -1) {
+                                let depth = 0, inStr = false, esc = false;
+                                for (let i = brace; i < htmlContent.length; i++) {
+                                    const ch = htmlContent[i];
+                                    if (inStr) {
+                                        if (esc) { esc = false; continue; }
+                                        if (ch === '\\\\') { esc = true; continue; }
+                                        if (ch === '"') inStr = false;
+                                        continue;
+                                    }
+                                    if (ch === '"') { inStr = true; continue; }
+                                    if (ch === '{') depth++;
+                                    else if (ch === '}') {
+                                        depth--;
+                                        if (depth === 0) {
+                                            jsonStr = htmlContent.slice(brace, i + 1);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (jsonStr) {
+                            const parsedEmb = JSON.parse(jsonStr);
+                            verified =
+                                Array.isArray(parsedEmb.transactions) && parsedEmb.transactions.length === transactions.length &&
+                                Array.isArray(parsedEmb.diningRecords) && parsedEmb.diningRecords.length === diningRecords.length &&
+                                Array.isArray(parsedEmb.travelRecords) && parsedEmb.travelRecords.length === travelRecords.length &&
+                                Array.isArray(parsedEmb.buySellItems) && parsedEmb.buySellItems.length === buySellItems.length;
+                        }
+                    } catch (ve) {
+                        console.warn('export verify parse error', ve);
+                        verified = false;
+                    }
+
+                    if (!verified) {
+                        showToast('匯出失敗：資料未正確寫入檔案', 'error');
+                        console.error('Export verification failed, length=' + htmlContent.length);
+                        return;
+                    }
+
+                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'Kumamon 記帳_含資料_' + new Date().toISOString().split('T')[0] + '.html';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast('已匯出含 ' + transactions.length + ' 筆一般紀錄的 HTML');
+                } catch (e) {
+                    console.error(e);
+                    showToast('匯出失敗：' + (e && e.message ? e.message : '未知錯誤'), 'error');
+                }
+            };
+
+                        const handleImportClick = () => fileInputRef.current?.click();
 
             // FIX(P1-4): bundle／舊買賣／純交易 一律先彈 ImportModal，不直接覆蓋
             const normalizeOldBuySellItems = (items) => (items || []).map(x => ({
@@ -2775,7 +2776,9 @@
                                 Kumamon 記帳
                             </h1>
                             <div className="flex items-center gap-1">
+                                {/* FIX(P1-6): 接上「匯出含資料 HTML」UI */}
                                 <button onClick={handleExportJson} title="匯出 JSON" aria-label="匯出 JSON" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.Export /></button>
+                                <button onClick={handleExportHtml} title="匯出含資料的 HTML" aria-label="匯出含資料的 HTML" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.FileDown /></button>
                                 <button onClick={handleImportClick} title="匯入 JSON" aria-label="匯入 JSON" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.Import /></button>
                                 <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
                                 <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1"></div>
