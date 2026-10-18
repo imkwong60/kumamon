@@ -1592,6 +1592,10 @@
             const cloudTimer = useRef(null);
             // FIX(P0-1): 雲端衝突待使用者選擇時，暫停自動 push，避免覆蓋較新雲端
             const cloudConflictPending = useRef(false);
+            // 即時同步：略過自己刚推上去的回聲；記錄已套用的雲端時間
+            const pushingRef = useRef(false);
+            const lastAppliedCloudTs = useRef(null);
+            const cloudChannelRef = useRef(null);
 
             // FIX(P0-1): 套用雲端 payload 到本機 state，並寫入 last-modified
             // applyingCloudRef：標記「這次 state 變更來自雲端」，避免 data effect 再 touchLocalModified / 清衝突
@@ -1645,6 +1649,7 @@
                 } catch (e) {
                     console.warn('applyCloudPayload sync flush failed', e);
                 }
+                lastAppliedCloudTs.current = ts;
             };
 
             const pushCloud = async () => {
@@ -1653,7 +1658,9 @@
                     setSyncStatus(navigator.onLine ? '本機' : '離線');
                     return;
                 }
+                if (cloudConflictPending.current) return;
                 try {
+                    pushingRef.current = true;
                     setSyncStatus('同步中…');
                     // FIX(P0-1): push 時用本機 last-modified（若無則補上）
                     const localTs = getLocalModified() || touchLocalModified();
@@ -1675,10 +1682,14 @@
                     const { error } = await sb.from('notepad_data').upsert(payload, { onConflict: 'id' });
                     if (error) throw error;
                     setLocalModified(localTs);
+                    lastAppliedCloudTs.current = localTs;
                     setSyncStatus('已同步雲端');
                 } catch (e) {
                     console.warn('cloud push', e);
                     setSyncStatus('本機已存（雲端失敗）');
+                } finally {
+                    // 稍延遲再關，避免 realtime 回聲搶在 finally 後立刻套用
+                    setTimeout(() => { pushingRef.current = false; }, 800);
                 }
             };
 
@@ -1688,9 +1699,43 @@
                 cloudTimer.current = setTimeout(() => { pushCloud(); }, 600);
             };
 
-            // FIX(P0-1): 初次從雲端拉時比對 updatedAt，禁止靜默覆蓋本機
+            // 從雲端列套用（即時／前景拉取共用）；僅當雲端較新且無衝突等待
+            const tryApplyRemoteRow = (row, { toastOnApply } = {}) => {
+                if (!row || cloudConflictPending.current || pushingRef.current) return false;
+                const cloudData = row.data;
+                if (!cloudData || typeof cloudData !== 'object') return false;
+                const cloudUpdatedAt = row.updated_at || cloudData.updatedAt || null;
+                if (cloudUpdatedAt && lastAppliedCloudTs.current && String(cloudUpdatedAt) === String(lastAppliedCloudTs.current)) {
+                    return false; // 自己推上去的回聲
+                }
+                const localUpdatedAt = getLocalModified();
+                const localTime = localUpdatedAt ? new Date(localUpdatedAt).getTime() : NaN;
+                const cloudTime = cloudUpdatedAt ? new Date(cloudUpdatedAt).getTime() : NaN;
+                if (!isNaN(localTime) && !isNaN(cloudTime) && cloudTime <= localTime) {
+                    return false; // 本機同等或較新，不覆蓋
+                }
+                applyCloudPayload(cloudData, cloudUpdatedAt);
+                setSyncStatus('已即時同步');
+                if (toastOnApply) showToast('已從其他裝置同步');
+                return true;
+            };
+
+            const softPullCloud = async ({ toastOnApply } = {}) => {
+                const sb = getSb();
+                if (!sb || !navigator.onLine || cloudConflictPending.current || pushingRef.current) return;
+                try {
+                    const { data, error } = await sb.from('notepad_data').select('data, updated_at').eq('id', CLOUD_ROW_ID).maybeSingle();
+                    if (error) throw error;
+                    if (data) tryApplyRemoteRow(data, { toastOnApply });
+                } catch (e) {
+                    console.warn('soft pull', e);
+                }
+            };
+
+            // FIX(P0-1): 初次從雲端拉時比對 updatedAt；之後訂閱 Realtime + 前景／定時拉取
             useEffect(() => {
                 let cancelled = false;
+                let pollTimer = null;
                 (async () => {
                     const sb = getSb();
                     if (!sb || !navigator.onLine) {
@@ -1724,7 +1769,7 @@
                         // 本機無資料 → 直接採用雲端
                         if (!localHas) {
                             applyCloudPayload(data.data, cloudUpdatedAt);
-                            setSyncStatus('已從雲端載入');
+                            setSyncStatus('已從雲端載入 · 即時同步中');
                             return;
                         }
 
@@ -1734,6 +1779,7 @@
 
                         // 本機較新（或同等）→ 不覆蓋，改上傳本機
                         if (localIsNewerOrEqual) {
+                            lastAppliedCloudTs.current = localUpdatedAt || cloudUpdatedAt;
                             setSyncStatus('本機較新 · 上傳中…');
                             setTimeout(() => pushCloud(), 800);
                             return;
@@ -1753,11 +1799,10 @@
                             onConfirm: () => {
                                 applyCloudPayload(cloudDataRef, cloudTsRef);
                                 cloudConflictPending.current = false;
-                                setSyncStatus('已從雲端載入');
+                                setSyncStatus('已從雲端載入 · 即時同步中');
                                 showToast('已採用雲端資料');
                             },
                             onAltConfirm: () => {
-                                // 強制把本機 last-modified 推到 now，避免推上去的 updated_at 仍舊於雲端
                                 touchLocalModified();
                                 cloudConflictPending.current = false;
                                 setSyncStatus('本機 · 上傳中…');
@@ -1770,20 +1815,74 @@
                         if (!cancelled) setSyncStatus('本機模式');
                     } finally {
                         cloudReady.current = true;
+                        if (cancelled) return;
+                        const sb2 = getSb();
+                        if (!sb2) return;
+
+                        // Supabase Realtime：其他裝置寫入時即時套用
+                        try {
+                            if (cloudChannelRef.current) {
+                                try { sb2.removeChannel(cloudChannelRef.current); } catch (_) {}
+                            }
+                            const channel = sb2.channel('kumamon-live-' + CLOUD_ROW_ID)
+                                .on('postgres_changes', {
+                                    event: '*',
+                                    schema: 'public',
+                                    table: 'notepad_data',
+                                    filter: 'id=eq.' + CLOUD_ROW_ID
+                                }, (payload) => {
+                                    if (cancelled) return;
+                                    const row = payload.new || payload.record;
+                                    if (!row) return;
+                                    tryApplyRemoteRow(row, { toastOnApply: true });
+                                })
+                                .subscribe((status) => {
+                                    if (status === 'SUBSCRIBED') {
+                                        console.info('[Kumamon] realtime subscribed');
+                                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                                        console.warn('[Kumamon] realtime status', status);
+                                    }
+                                });
+                            cloudChannelRef.current = channel;
+                        } catch (re) {
+                            console.warn('realtime subscribe failed', re);
+                        }
+
+                        // 後備：回到前景時拉取；每 25 秒輪詢一次（Realtime 未開表也能同步）
+                        pollTimer = setInterval(() => {
+                            if (document.visibilityState === 'visible') softPullCloud({ toastOnApply: false });
+                        }, 25000);
                     }
                 })();
-                const onOnline = () => { setSyncStatus('連線中…'); scheduleCloud(); };
+
+                const onOnline = () => { setSyncStatus('連線中…'); scheduleCloud(); softPullCloud({ toastOnApply: false }); };
                 const onOffline = () => setSyncStatus('離線');
+                const onVisible = () => {
+                    if (document.visibilityState === 'visible') {
+                        softPullCloud({ toastOnApply: true });
+                    }
+                };
                 window.addEventListener('online', onOnline);
                 window.addEventListener('offline', onOffline);
+                document.addEventListener('visibilitychange', onVisible);
+                window.addEventListener('focus', onVisible);
+
                 return () => {
                     cancelled = true;
                     window.removeEventListener('online', onOnline);
                     window.removeEventListener('offline', onOffline);
+                    document.removeEventListener('visibilitychange', onVisible);
+                    window.removeEventListener('focus', onVisible);
+                    if (pollTimer) clearInterval(pollTimer);
+                    const sb = getSb();
+                    if (sb && cloudChannelRef.current) {
+                        try { sb.removeChannel(cloudChannelRef.current); } catch (_) {}
+                        cloudChannelRef.current = null;
+                    }
                 };
             }, []);
 
-            // FIX(P0-1)+Bug2: 僅帳本／設定變更才 touchLocalModified；theme 變更不碰 lastModified
+                        // FIX(P0-1)+Bug2: 僅帳本／設定變更才 touchLocalModified；theme 變更不碰 lastModified
             // （否則衝突取消後切主題再刷新，本機會被誤判較新而覆蓋雲端）
             // - 來自 applyCloudPayload：不 touch、不自動 push
             // - 衝突等待中：不清 pending；pending 只由彈窗按鈕清除
