@@ -2076,33 +2076,61 @@
                 reader.onload = (event) => {
                     try {
                         const parsed = JSON.parse(event.target.result);
-                        // 新格式：{ transactions, diningRecords, travelRecords, buySellItems }；舊格式：純陣列
-                        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (Array.isArray(parsed.diningRecords) || Array.isArray(parsed.travelRecords) || Array.isArray(parsed.buySellItems) || Array.isArray(parsed.transactions))) {
+                        if (!parsed || typeof parsed !== 'object') throw new Error('無效格式');
+
+                        // 舊版「買賣記錄」獨立匯出：{ version, rates, items: [{ buyPrice, name, ... }] }
+                        const isOldBuySell = Array.isArray(parsed.items) && parsed.items.length > 0 &&
+                            (parsed.items[0].buyPrice != null || parsed.items[0].status === 'owned' || parsed.items[0].status === 'sold' || parsed.items[0].name);
+                        const isBundle = Array.isArray(parsed.diningRecords) || Array.isArray(parsed.travelRecords) ||
+                            Array.isArray(parsed.buySellItems) || Array.isArray(parsed.transactions);
+
+                        if (!Array.isArray(parsed) && (isBundle || isOldBuySell)) {
                             if (Array.isArray(parsed.transactions)) setTransactions(parsed.transactions);
                             if (Array.isArray(parsed.diningRecords)) setDiningRecords(parsed.diningRecords);
                             if (Array.isArray(parsed.travelRecords)) setTravelRecords(parsed.travelRecords);
-                            if (Array.isArray(parsed.buySellItems)) setBuySellItems(parsed.buySellItems);
-                            else if (Array.isArray(parsed.items) && parsed.items[0] && parsed.items[0].buyPrice != null) setBuySellItems(parsed.items);
+                            if (Array.isArray(parsed.buySellItems)) {
+                                setBuySellItems(parsed.buySellItems);
+                            } else if (isOldBuySell) {
+                                setBuySellItems(parsed.items.map(x => ({
+                                    id: x.id || generateId(),
+                                    name: x.name || '未命名',
+                                    category: BUYSELL_CATEGORIES.includes(x.category) ? x.category : (x.category || '其他'),
+                                    currency: CURRENCY_OPTIONS.some(c => c.key === x.currency) ? x.currency : 'HKD',
+                                    status: x.status === 'sold' ? 'sold' : 'owned',
+                                    buyDate: x.buyDate || null,
+                                    buyPrice: Number(x.buyPrice) || 0,
+                                    buyFrom: x.buyFrom || '',
+                                    sellDate: x.sellDate || null,
+                                    sellPrice: x.sellPrice != null ? Number(x.sellPrice) : null,
+                                    serial: x.serial || '',
+                                    notes: x.notes || '',
+                                    updatedAt: x.updatedAt || new Date().toISOString(),
+                                    createdAt: x.createdAt || x.updatedAt || new Date().toISOString()
+                                })));
+                            }
                             if (parsed.settings) {
                                 const s = { ...parsed.settings };
-                                s.rates = { ...DEFAULT_RATES, ...(s.rates || {}), ...(parsed.buySellRates || {}), ...(parsed.rates && parsed.items ? parsed.rates : {}), HKD: 1 };
+                                s.rates = { ...DEFAULT_RATES, ...(s.rates || {}), ...(parsed.buySellRates || {}), ...(parsed.rates ? parsed.rates : {}), HKD: 1 };
                                 setSettings(s);
-                            } else if (parsed.buySellRates || (parsed.rates && parsed.items)) {
+                            } else if (parsed.rates || parsed.buySellRates) {
                                 setSettings(prev => ({
                                     ...prev,
-                                    rates: { ...DEFAULT_RATES, ...(prev.rates || {}), ...(parsed.buySellRates || parsed.rates || {}), HKD: 1 }
+                                    rates: { ...DEFAULT_RATES, ...(prev.rates || {}), ...(parsed.buySellRates || {}), ...(parsed.rates || {}), HKD: 1 }
                                 }));
                             }
                             if (parsed.categories) setCategories(parsed.categories);
-                            showToast('已匯入（含專用記錄）');
+                            showToast(isOldBuySell && !isBundle ? `已匯入 ${parsed.items.length} 筆買賣記錄` : '已匯入（含專用記錄）');
                             return;
                         }
+
+                        // 舊格式：純交易陣列 或 { transactions: [...] }
                         const imported = Array.isArray(parsed) ? parsed : (parsed.transactions || null);
-                        if (!Array.isArray(imported)) throw new Error("無效格式");
+                        if (!Array.isArray(imported)) throw new Error('無效格式');
                         const isValid = imported.every(item => item.id && item.date && item.amount !== undefined);
-                        if (!isValid) throw new Error("資料結構錯誤");
+                        if (!isValid) throw new Error('資料結構錯誤');
                         setImportData(imported);
                     } catch (error) {
+                        console.warn('import error', error);
                         showToast('匯入失敗：請確認檔案格式正確', 'error');
                     }
                     e.target.value = '';
@@ -2150,10 +2178,8 @@
                                 <button onClick={handleExportJson} title="匯出 JSON" aria-label="匯出 JSON" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.Export /></button>
                                 <button onClick={handleImportClick} title="匯入 JSON" aria-label="匯入 JSON" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.Import /></button>
                                 <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-                                <button onClick={handleExportHtml} title="匯出完整 HTML（含所有紀錄）" aria-label="匯出完整 HTML" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.FileDown /></button>
                                 <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1"></div>
                                 <button onClick={() => setIsSettingsOpen(true)} title="設定" aria-label="設定" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><Icons.Settings /></button>
-                                <button onClick={handleClearAll} title="清空資料" aria-label="清空所有資料" className="p-2 text-zinc-500 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"><Icons.Clear /></button>
                                 <button onClick={toggleTheme} title="切換主題" aria-label={theme === 'dark' ? '切換至淺色模式' : '切換至深色模式'} className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors">
                                     {theme === 'dark' ? <Icons.Sun /> : <Icons.Moon />}
                                 </button>
