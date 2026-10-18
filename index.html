@@ -1,9 +1,20 @@
 <!DOCTYPE html>
-<html lang="zh-TW" class="light">
+<html lang="zh-Hant" class="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
     <title>Kumamon 記帳</title>
+    <meta name="description" content="記帳・飲食・旅遊・買賣物件 — 本機＋雲端同步">
+    <meta name="theme-color" content="#18181b" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Kumamon記帳">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -49,6 +60,13 @@
             border-radius: 10px;
             object-fit: cover;
             background: #fff;
+        }
+        /* iPhone 瀏海 / 底部 Home Indicator */
+        body {
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            padding-left: env(safe-area-inset-left, 0px);
+            padding-right: env(safe-area-inset-right, 0px);
         }
     </style>
 
@@ -2594,6 +2612,15 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js', { scope: './' })
+                    .then((reg) => console.info('[Kumamon PWA] SW registered', reg.scope))
+                    .catch((err) => console.warn('[Kumamon PWA] SW failed', err));
+            });
+        }
     </script>
 </body>
 </html>
