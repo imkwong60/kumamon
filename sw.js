@@ -1,16 +1,14 @@
-/* Kumamon 記帳 Service Worker
- * 策略：App 外殼 cache-first + 資料／API 分層 fallback
- * - 同源靜態／導航：cache-first，離線必回 index 或內建 offline 頁
- * - 執行期 CDN（React／Babel／Tailwind／supabase-js UMD）：視為外殼依賴，cache-first
- * - Supabase REST／Auth／Realtime API：不攔截、不快取
- * - 其他第三方：直接放行
+/* Kumamon 記帳 Service Worker v7
+ * App 外殼 cache-first + API 不攔截
+ * 修正：PRECACHE 非原子、導航不依賴 waitUntil 背景更新、
+ *       offline 頁 200、HTML 非 navigate、SKIP_WAITING listener
  */
-const APP_SHELL_CACHE = 'kumamon-shell-v6';
+const APP_SHELL_CACHE = 'kumamon-shell-v7';
 const IMAGE_CACHE = 'kumamon-images-v1';
 const IMAGE_CACHE_LIMIT = 200;
 
+/** 外殼資源（逐項 allSettled，避免單一 404 讓整次 install 失敗） */
 const PRECACHE = [
-  './',
   './index.html',
   './manifest.json',
   './icon-180.png',
@@ -18,7 +16,7 @@ const PRECACHE = [
   './icon-512.png'
 ];
 
-/** 本 App 執行期必需的 CDN（等同外殼依賴；首次 online 安裝後才可離線） */
+/** 執行期必需 CDN＝外殼依賴（首次 online 成功後才可離線跑 React） */
 const RUNTIME_CDN = [
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/react@18/umd/react.production.min.js',
@@ -55,30 +53,52 @@ function isSameOrigin(url) {
 }
 
 function isNavigationRequest(req) {
-  return req.mode === 'navigate' ||
-    (req.method === 'GET' && req.headers.get('accept') && req.headers.get('accept').includes('text/html'));
+  return req.mode === 'navigate';
+}
+
+/** 導航或明確要 HTML 的 GET（含匯出備份檔被當普通 GET） */
+function isHtmlShellRequest(req, url) {
+  if (isNavigationRequest(req)) return true;
+  if (req.method !== 'GET') return false;
+  const accept = req.headers.get('accept') || '';
+  if (accept.includes('text/html')) return true;
+  if (isSameOrigin(url) && /\.html?$/i.test(url.pathname)) return true;
+  // 目錄根路徑常當 HTML 入口
+  if (isSameOrigin(url) && (url.pathname === '/' || url.pathname.endsWith('/'))) return true;
+  return false;
 }
 
 function isRuntimeCdn(url) {
   const href = url.href;
-  return RUNTIME_CDN.some((u) => href === u || href.startsWith(u + '?') || href.startsWith(u + '/')) ||
-    href.includes('cdn.tailwindcss.com') ||
-    (href.includes('unpkg.com/react@') || href.includes('unpkg.com/react-dom@') || href.includes('unpkg.com/@babel/')) ||
-    href.includes('cdn.jsdelivr.net/npm/@supabase/supabase-js');
+  if (RUNTIME_CDN.some((u) => href === u || href.startsWith(u + '?') || href.startsWith(u + '/'))) {
+    return true;
+  }
+  // 寬鬆匹配，避免 query/redirect 變體漏網
+  if (href.includes('cdn.tailwindcss.com')) return true;
+  if (href.includes('unpkg.com/react@') || href.includes('unpkg.com/react-dom@')) return true;
+  if (href.includes('unpkg.com/@babel/standalone')) return true;
+  if (href.includes('cdn.jsdelivr.net/npm/@supabase/supabase-js')) return true;
+  return false;
 }
 
-/** Supabase 後端 API／Realtime／Auth：絕不攔截 */
+/** Supabase 後端：不攔截、不快取 */
 function isSupabaseApi(url) {
   const host = url.hostname;
-  return host.endsWith('.supabase.co') ||
-    host.endsWith('.supabase.in') ||
-    host.includes('supabase.co') && (
-      url.pathname.startsWith('/rest/') ||
-      url.pathname.startsWith('/auth/') ||
-      url.pathname.startsWith('/realtime/') ||
-      url.pathname.startsWith('/storage/') ||
-      url.pathname.startsWith('/functions/')
-    );
+  if (host.endsWith('.supabase.co') || host.endsWith('.supabase.in')) return true;
+  // 其他 supabase 子域且路徑像 API
+  if (host.includes('supabase')) {
+    const p = url.pathname;
+    if (
+      p.startsWith('/rest/') ||
+      p.startsWith('/auth/') ||
+      p.startsWith('/realtime/') ||
+      p.startsWith('/storage/') ||
+      p.startsWith('/functions/')
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isImageRequest(req, url) {
@@ -87,50 +107,100 @@ function isImageRequest(req, url) {
 }
 
 function isJsonList(url) {
-  return /\.json(\?|$)/i.test(url.pathname) && isSameOrigin(url) && !url.pathname.endsWith('manifest.json');
+  return (
+    isSameOrigin(url) &&
+    /\.json(\?|$)/i.test(url.pathname) &&
+    !url.pathname.endsWith('manifest.json')
+  );
 }
 
 function hasAuthHeader(req) {
   return req.headers.has('Authorization') || req.headers.has('authorization');
 }
 
-async function trimImageCache() {
-  const cache = await caches.open(IMAGE_CACHE);
-  const keys = await cache.keys();
-  if (keys.length <= IMAGE_CACHE_LIMIT) return;
-  const overflow = keys.length - IMAGE_CACHE_LIMIT;
-  for (let i = 0; i < overflow; i++) {
-    await cache.delete(keys[i]); // FIFO
-  }
+async function matchShellHtml(cache) {
+  return (
+    (await cache.match('./index.html', { ignoreSearch: true })) ||
+    (await cache.match('/index.html', { ignoreSearch: true })) ||
+    (await cache.match('index.html', { ignoreSearch: true })) ||
+    (await cache.match('./', { ignoreSearch: true })) ||
+    (await cache.match(self.registration.scope, { ignoreSearch: true }))
+  );
 }
 
 async function shellFallback() {
-  const cache = await caches.open(APP_SHELL_CACHE);
-  const hit =
-    (await cache.match('./index.html', { ignoreSearch: true })) ||
-    (await cache.match('/index.html', { ignoreSearch: true })) ||
-    (await cache.match('./', { ignoreSearch: true })) ||
-    (await cache.match(self.registration.scope, { ignoreSearch: true }));
-  if (hit) return hit;
+  try {
+    const cache = await caches.open(APP_SHELL_CACHE);
+    const hit = await matchShellHtml(cache);
+    if (hit) return hit;
+  } catch (_) {}
+  // 200：避免部分 WebView／PWA 殼把 5xx 當錯誤頁
   return new Response(OFFLINE_HTML, {
-    status: 503,
-    statusText: 'Offline',
-    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }
+    status: 200,
+    statusText: 'OK',
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store'
+    }
   });
+}
+
+/** 盡力寫入單一 URL；失敗不丟錯 */
+async function tryCacheAdd(cache, url) {
+  try {
+    const res = await fetch(url, { cache: 'reload', credentials: 'same-origin' });
+    if (res && res.ok) {
+      await cache.put(url, res.clone());
+      return true;
+    }
+  } catch (_) {}
+  try {
+    await cache.add(url);
+    return true;
+  } catch (_) {}
+  return false;
+}
+
+async function tryCacheCdn(cache, url) {
+  try {
+    const res = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'reload' });
+    if (res && res.ok) {
+      // 同時用字串 key 與 Request，提高 match 命中率
+      await cache.put(url, res.clone());
+      await cache.put(new Request(url, { mode: 'cors', credentials: 'omit' }), res.clone());
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+async function trimImageCache() {
+  try {
+    const cache = await caches.open(IMAGE_CACHE);
+    const keys = await cache.keys();
+    if (keys.length <= IMAGE_CACHE_LIMIT) return;
+    // 規格未保證 keys() 為插入序；此為 best-effort 淘汰，非嚴格 FIFO
+    const overflow = keys.length - IMAGE_CACHE_LIMIT;
+    for (let i = 0; i < overflow; i++) {
+      await cache.delete(keys[i]);
+    }
+  } catch (_) {}
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(APP_SHELL_CACHE);
-    await cache.addAll(PRECACHE);
-    await Promise.allSettled(
-      RUNTIME_CDN.map(async (u) => {
-        try {
-          const res = await fetch(u, { mode: 'cors', credentials: 'omit' });
-          if (res.ok) await cache.put(u, res.clone());
-        } catch (_) {}
-      })
-    );
+
+    // 1) 優先確保 index.html（離線開啟的最低門檻）
+    await tryCacheAdd(cache, './index.html');
+
+    // 2) 其餘外殼：allSettled，單一 404 不拖垮 install
+    await Promise.allSettled(PRECACHE.map((u) => tryCacheAdd(cache, u)));
+
+    // 3) CDN：失敗不阻 install（但白屏風險仍在，靠首次線上造訪補齊）
+    await Promise.allSettled(RUNTIME_CDN.map((u) => tryCacheCdn(cache, u)));
+
+    // 立即接管：記帳 App 需要新 SW 盡快生效以修復離線
     await self.skipWaiting();
   })());
 });
@@ -144,6 +214,14 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
+// 與頁面 reg.waiting.postMessage({ type: 'SKIP_WAITING' }) 對齊
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (data === 'SKIP_WAITING' || (data && data.type === 'SKIP_WAITING')) {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -151,28 +229,30 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
 
+  // API 直接放行
   if (isSupabaseApi(url)) return;
 
-  // 導航：cache-first → 背景更新 → 內建 offline HTML
-  if (isNavigationRequest(req)) {
+  // HTML 外殼（navigate + 非 navigate 的 HTML GET）：純 cache-first，不背景 waitUntil
+  if (isHtmlShellRequest(req, url)) {
     event.respondWith((async () => {
-      const cache = await caches.open(APP_SHELL_CACHE);
-      const cached =
-        (await cache.match('./index.html', { ignoreSearch: true })) ||
-        (await cache.match(req, { ignoreSearch: true }));
-      if (cached) {
-        event.waitUntil((async () => {
-          try {
-            const fresh = await fetch(req);
-            if (fresh && fresh.ok) await cache.put('./index.html', fresh.clone());
-          } catch (_) {}
-        })());
-        return cached;
-      }
       try {
-        const fresh = await fetch(req);
-        if (fresh && fresh.ok) await cache.put('./index.html', fresh.clone());
-        return fresh;
+        const cache = await caches.open(APP_SHELL_CACHE);
+        const cached = await matchShellHtml(cache);
+        if (cached) return cached;
+
+        try {
+          const fresh = await fetch(req);
+          if (fresh && fresh.ok) {
+            await cache.put('./index.html', fresh.clone());
+            // 若請求本身是某 .html，也存一份
+            if (isSameOrigin(url)) {
+              try { await cache.put(req, fresh.clone()); } catch (_) {}
+            }
+          }
+          return fresh;
+        } catch (_) {
+          return shellFallback();
+        }
       } catch (_) {
         return shellFallback();
       }
@@ -180,26 +260,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 執行期 CDN：cache-first（外殼依賴）
+  // 執行期 CDN：cache-first
   if (isRuntimeCdn(url)) {
     event.respondWith((async () => {
       const cache = await caches.open(APP_SHELL_CACHE);
-      const hit = await cache.match(req) || await cache.match(url.href);
-      if (hit) {
-        event.waitUntil((async () => {
-          try {
-            const fresh = await fetch(req, { mode: 'cors', credentials: 'omit' });
-            if (fresh && fresh.ok) await cache.put(req, fresh.clone());
-          } catch (_) {}
-        })());
-        return hit;
-      }
+      const hit =
+        (await cache.match(req)) ||
+        (await cache.match(url.href)) ||
+        (await cache.match(new Request(url.href, { mode: 'cors', credentials: 'omit' })));
+      if (hit) return hit;
+
       try {
         const fresh = await fetch(req, { mode: 'cors', credentials: 'omit' });
-        if (fresh && fresh.ok) await cache.put(req, fresh.clone());
+        if (fresh && fresh.ok) {
+          await cache.put(req, fresh.clone());
+          await cache.put(url.href, fresh.clone());
+        }
         return fresh;
-      } catch (err) {
-        return new Response('', { status: 503, statusText: 'CDN offline' });
+      } catch (_) {
+        return new Response(
+          '/* offline: CDN not cached. Open the app once online. */',
+          { status: 503, headers: { 'Content-Type': 'application/javascript' } }
+        );
       }
     })());
     return;
@@ -220,7 +302,7 @@ self.addEventListener('fetch', (event) => {
         const hit = await cache.match(req);
         if (hit) return hit;
         return new Response(JSON.stringify({ error: 'offline', items: [] }), {
-          status: 503,
+          status: 200,
           headers: { 'Content-Type': 'application/json' }
         });
       }
@@ -228,7 +310,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 同源圖片：獨立 cache + 200 筆 FIFO
+  // 同源圖片：獨立 cache + 上限（best-effort 淘汰）
   if (isImageRequest(req, url)) {
     event.respondWith((async () => {
       const cache = await caches.open(IMAGE_CACHE);
@@ -238,12 +320,15 @@ self.addEventListener('fetch', (event) => {
         const fresh = await fetch(req);
         if (fresh && fresh.ok) {
           await cache.put(req, fresh.clone());
-          trimImageCache().catch(() => {});
+          trimImageCache();
         }
         return fresh;
       } catch (_) {
-        const empty = Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'), c => c.charCodeAt(0));
-        return new Response(empty, { status: 503, headers: { 'Content-Type': 'image/gif' } });
+        const empty = Uint8Array.from(
+          atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'),
+          (c) => c.charCodeAt(0)
+        );
+        return new Response(empty, { status: 200, headers: { 'Content-Type': 'image/gif' } });
       }
     })());
     return;
@@ -253,23 +338,13 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(APP_SHELL_CACHE);
     const hit = await cache.match(req);
-    if (hit) {
-      event.waitUntil((async () => {
-        try {
-          const fresh = await fetch(req);
-          if (fresh && fresh.ok) await cache.put(req, fresh.clone());
-        } catch (_) {}
-      })());
-      return hit;
-    }
+    if (hit) return hit;
     try {
       const fresh = await fetch(req);
       if (fresh && fresh.ok) await cache.put(req, fresh.clone());
       return fresh;
     } catch (_) {
-      if (req.headers.get('accept') && req.headers.get('accept').includes('text/html')) {
-        return shellFallback();
-      }
+      if (isHtmlShellRequest(req, url)) return shellFallback();
       return new Response('', { status: 503, statusText: 'Offline' });
     }
   })());
