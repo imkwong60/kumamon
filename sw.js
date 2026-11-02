@@ -1,9 +1,9 @@
-/* Kumamon 記帳 Service Worker v7
+/* Kumamon 記帳 Service Worker v8
  * App 外殼 cache-first + API 不攔截
  * 修正：PRECACHE 非原子、導航不依賴 waitUntil 背景更新、
  *       offline 頁 200、HTML 非 navigate、SKIP_WAITING listener
  */
-const APP_SHELL_CACHE = 'kumamon-shell-v8';
+const APP_SHELL_CACHE = 'kumamon-shell-v9';
 const IMAGE_CACHE = 'kumamon-images-v1';
 const IMAGE_CACHE_LIMIT = 200;
 
@@ -11,7 +11,6 @@ const IMAGE_CACHE_LIMIT = 200;
 const PRECACHE = [
   './index.html',
   './manifest.json',
-  './icon-180.png',
   './icon-192.png',
   './icon-512.png'
 ];
@@ -232,30 +231,28 @@ self.addEventListener('fetch', (event) => {
   // API 直接放行
   if (isSupabaseApi(url)) return;
 
-  // HTML 外殼（navigate + 非 navigate 的 HTML GET）：純 cache-first，不背景 waitUntil
+    // HTML 外殼：有網先拉最新（避免 GitHub 發佈後仍顯示舊版），失敗才用 cache；離線必有 fallback
   if (isHtmlShellRequest(req, url)) {
     event.respondWith((async () => {
+      const cache = await caches.open(APP_SHELL_CACHE);
       try {
-        const cache = await caches.open(APP_SHELL_CACHE);
-        const cached = await matchShellHtml(cache);
-        if (cached) return cached;
-
-        try {
-          const fresh = await fetch(req);
-          if (fresh && fresh.ok) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 4000);
+        const fresh = await fetch(req, { cache: 'no-store', signal: ctrl.signal });
+        clearTimeout(timer);
+        if (fresh && fresh.ok) {
+          try {
             await cache.put('./index.html', fresh.clone());
-            // 若請求本身是某 .html，也存一份
-            if (isSameOrigin(url)) {
-              try { await cache.put(req, fresh.clone()); } catch (_) {}
-            }
-          }
+            if (isSameOrigin(url)) await cache.put(req, fresh.clone());
+          } catch (_) {}
           return fresh;
-        } catch (_) {
-          return shellFallback();
         }
       } catch (_) {
-        return shellFallback();
+        /* 離線或逾時 → cache */
       }
+      const cached = await matchShellHtml(cache);
+      if (cached) return cached;
+      return shellFallback();
     })());
     return;
   }
