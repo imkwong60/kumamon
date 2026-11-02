@@ -3716,14 +3716,33 @@
                 navigator.serviceWorker.register('./sw.js', { scope: './' })
                     .then((reg) => {
                         console.info('[Kumamon PWA] SW registered', reg.scope);
-                        // 有等待中的新 SW 時提示（可選：直接 skipWaiting 由 SW 處理）
-                        if (reg.waiting) {
-                            reg.waiting.postMessage && reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                        }
+                        // 讓 waiting 中的新 SW 立刻 activate（對應 sw message listener）
+                        const kick = (worker) => {
+                            if (!worker) return;
+                            try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (_) {}
+                        };
+                        if (reg.waiting) kick(reg.waiting);
+                        reg.addEventListener('updatefound', () => {
+                            const w = reg.installing;
+                            if (!w) return;
+                            w.addEventListener('statechange', () => {
+                                if (w.state === 'installed' && navigator.serviceWorker.controller) {
+                                    kick(w);
+                                }
+                            });
+                        });
                     })
                     .catch((err) => {
                         console.warn('[Kumamon PWA] SW failed (App 仍可用本機模式)', err);
                     });
+
+                // 新 SW 取得控制權後重整一次，避免舊頁面仍掛舊 cache／白屏
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    window.location.reload();
+                });
             });
         }
     </script>
