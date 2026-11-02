@@ -3163,13 +3163,11 @@
                                 <img src={KUMAMON_LOGO_SRC} alt="熊本熊" className="kumamon-logo" />
                                 Kumamon 記帳
                                 <span
-                                    className={`inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${isOnline ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'}`}
+                                    className={`inline-block w-2 h-2 rounded-full ml-1.5 shrink-0 ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`}
                                     title={isOnline ? '已連線' : '離線模式 · 本機資料可用'}
                                     aria-label={isOnline ? '網路已連線' : '目前離線'}
-                                >
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                    {isOnline ? '在線' : '離線'}
-                                </span>
+                                    role="status"
+                                />
                             </h1>
                             <div className="flex items-center gap-1">
                                 {/* FIX(P1-6): 接上「匯出含資料 HTML」UI */}
