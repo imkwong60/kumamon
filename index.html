@@ -1677,6 +1677,7 @@
             const [editingBuySell, setEditingBuySell] = useState(null);
             const [buySellForceSell, setBuySellForceSell] = useState(false);
             const [syncStatus, setSyncStatus] = useState('就緒');
+            const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
             const cloudReady = useRef(false);
             const cloudTimer = useRef(null);
             // FIX(P0-1): 雲端衝突待使用者選擇時，暫停自動 push，避免覆蓋較新雲端
@@ -2006,13 +2007,17 @@
                 })();
 
                 const onOnline = () => {
+                    setIsOnline(true);
                     setSyncStatus('連線中…');
                     // 先拉雲端再視需要推
                     pullAndReconcile({ silent: true }).finally(() => scheduleCloud());
                     const sb = getSb();
                     if (sb) setupRealtime(sb);
                 };
-                const onOffline = () => setSyncStatus('離線');
+                const onOffline = () => {
+                    setIsOnline(false);
+                    setSyncStatus('離線');
+                };
                 // PWA 回到前景時再拉一次（Realtime 斷線時的備援）
                 const onVisibility = () => {
                     if (document.visibilityState === 'visible' && navigator.onLine && cloudReady.current) {
@@ -3157,6 +3162,14 @@
                             <h1 className="text-lg font-bold flex items-center gap-2.5 tracking-tight">
                                 <img src={KUMAMON_LOGO_SRC} alt="熊本熊" className="kumamon-logo" />
                                 Kumamon 記帳
+                                <span
+                                    className={`inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${isOnline ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'}`}
+                                    title={isOnline ? '已連線' : '離線模式 · 本機資料可用'}
+                                    aria-label={isOnline ? '網路已連線' : '目前離線'}
+                                >
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                    {isOnline ? '在線' : '離線'}
+                                </span>
                             </h1>
                             <div className="flex items-center gap-1">
                                 {/* FIX(P1-6): 接上「匯出含資料 HTML」UI */}
@@ -3194,6 +3207,17 @@
                         </div>
                     </div>
 
+                    {!isOnline && (
+                        <div className="max-w-3xl mx-auto px-4 pt-3">
+                            <div className="rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 px-3 py-2 text-xs flex items-start gap-2">
+                                <span className="mt-0.5">📡</span>
+                                <div>
+                                    <div className="font-medium">離線模式</div>
+                                    <div className="text-amber-800/90 dark:text-amber-200/90">本機帳本可正常瀏覽與記帳；雲端同步需恢復網絡後自動重試。</div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <main className="max-w-3xl mx-auto px-4 py-6 space-y-6"
                         onTouchStart={onSwipeStart}
                         onTouchEnd={onSwipeEnd}>
@@ -3688,11 +3712,20 @@
         root.render(<App />);
     </script>
     <script>
+        // Service Worker：註冊失敗不影響本機 localStorage 帳本
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js', { scope: './' })
-                    .then((reg) => console.info('[Kumamon PWA] SW registered', reg.scope))
-                    .catch((err) => console.warn('[Kumamon PWA] SW failed', err));
+                    .then((reg) => {
+                        console.info('[Kumamon PWA] SW registered', reg.scope);
+                        // 有等待中的新 SW 時提示（可選：直接 skipWaiting 由 SW 處理）
+                        if (reg.waiting) {
+                            reg.waiting.postMessage && reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    })
+                    .catch((err) => {
+                        console.warn('[Kumamon PWA] SW failed (App 仍可用本機模式)', err);
+                    });
             });
         }
     </script>
