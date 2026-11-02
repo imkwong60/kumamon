@@ -3,7 +3,7 @@
  * 修正：PRECACHE 非原子、導航不依賴 waitUntil 背景更新、
  *       offline 頁 200、HTML 非 navigate、SKIP_WAITING listener
  */
-const APP_SHELL_CACHE = 'kumamon-shell-v7';
+const APP_SHELL_CACHE = 'kumamon-shell-v8';
 const IMAGE_CACHE = 'kumamon-images-v1';
 const IMAGE_CACHE_LIMIT = 200;
 
