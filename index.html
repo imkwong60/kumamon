@@ -16,7 +16,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
 
-    <script src="./vendor/tailwindcss.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -29,20 +29,13 @@
             }
         }
     </script>
-    <!-- 關鍵樣式：原生 CSS（不依賴 Tailwind CDN），其餘仍交 Tailwind -->
-    <style>
-        /* logo 必須有固定尺寸，否則 base64 原圖會撑爆 header */
-        .kumamon-logo {
-            width: 32px !important;
-            height: 32px !important;
-            max-width: 32px !important;
-            max-height: 32px !important;
-            border-radius: 10px;
-            object-fit: cover;
-            background: #fff;
-            display: inline-block;
-            vertical-align: middle;
-            flex-shrink: 0;
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .scrollbar-hide::-webkit-scrollbar { display: none; }
+            .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        }
+        body {
+            @apply bg-zinc-50 text-zinc-900 transition-colors duration-200 dark:bg-zinc-950 dark:text-zinc-100;
         }
         .pie-chart {
             width: 120px;
@@ -55,36 +48,50 @@
             content: '';
             position: absolute;
             inset: 24px;
-            background: #fff;
+            background: white;
             border-radius: 50%;
         }
-        html.dark .pie-chart::after,
         .dark .pie-chart::after {
             background: #18181b;
         }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        /* iPhone 瀏海 / Home Indicator */
+        .kumamon-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            object-fit: cover;
+            background: #fff;
+        }
+        /* iPhone notch / Dynamic Island / Home Indicator 安全區 */
         body {
             padding-top: env(safe-area-inset-top, 0px);
             padding-bottom: env(safe-area-inset-bottom, 0px);
             padding-left: env(safe-area-inset-left, 0px);
             padding-right: env(safe-area-inset-right, 0px);
         }
-    </style>
-    <style type="text/tailwindcss">
-        @layer utilities {
-            .scrollbar-hide::-webkit-scrollbar { display: none; }
-            .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        /* sticky header 本身再吃一次 top inset，避免內容被 Dynamic Island 遮住 */
+        .sticky-safe-header {
+            padding-top: env(safe-area-inset-top, 0px);
         }
-        body {
-            @apply bg-zinc-50 text-zinc-900 transition-colors duration-200 dark:bg-zinc-950 dark:text-zinc-100;
+        /* 右下角 FAB 避開 Home Indicator */
+        .fab-safe {
+            bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+        }
+        @media (min-width: 768px) {
+            .fab-safe {
+                bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+            }
+        }
+        /* Modal 在有瀏海機型留白 */
+        .modal-safe-pad {
+            padding-top: max(1rem, env(safe-area-inset-top, 0px));
+            padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
         }
     </style>
-<script crossorigin src="./vendor/react.production.min.js"></script>
-    <script crossorigin src="./vendor/react-dom.production.min.js"></script>
-    <script src="./vendor/babel.min.js"></script>
-    <script src="./vendor/supabase.min.js"></script>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
@@ -140,6 +147,80 @@
             }
             return _sb;
         }
+
+        const PHOTOS_BUCKET = 'photos';
+
+        /** 將圖片預先壓成 JPEG（限制最長邊），回傳 Blob */
+        function compressImageToJpeg(file, maxSide = 1280, quality = 0.82, rotation = 0) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const angle = ((rotation % 360) + 360) % 360;
+                        const swapsDimensions = angle === 90 || angle === 270;
+                        const rotatedWidth = swapsDimensions ? img.height : img.width;
+                        const rotatedHeight = swapsDimensions ? img.width : img.height;
+                        const scale = Math.min(1, maxSide / Math.max(rotatedWidth, rotatedHeight));
+                        const width = Math.round(img.width * scale);
+                        const height = Math.round(img.height * scale);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(rotatedWidth * scale);
+                        canvas.height = Math.round(rotatedHeight * scale);
+                        const ctx = canvas.getContext('2d');
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        ctx.rotate(angle * Math.PI / 180);
+                        ctx.drawImage(img, -width / 2, -height / 2, width, height);
+                        canvas.toBlob(
+                            (blob) => {
+                                URL.revokeObjectURL(url);
+                                if (!blob) reject(new Error('無法壓縮圖片'));
+                                else resolve(blob);
+                            },
+                            'image/jpeg',
+                            quality
+                        );
+                    } catch (err) {
+                        URL.revokeObjectURL(url);
+                        reject(err);
+                    }
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('無法讀取圖片'));
+                };
+                img.src = url;
+            });
+        }
+
+        /** 上傳 JPEG 到 Supabase public bucket「photos」，回傳 public URL */
+        async function uploadRecordPhoto(jpegBlob, recordType, recordId, index = 0) {
+            const sb = getSb();
+            if (!sb) throw new Error('Supabase 未連線');
+            const path = `${recordType}/${recordId || 'tmp'}_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+            const { error } = await sb.storage.from(PHOTOS_BUCKET).upload(path, jpegBlob, {
+                contentType: 'image/jpeg',
+                upsert: true,
+                cacheControl: '3600'
+            });
+            if (error) throw error;
+            const { data } = sb.storage.from(PHOTOS_BUCKET).getPublicUrl(path);
+            return data.publicUrl;
+        }
+
+        /** 統一讀取紀錄相片（相容舊版單一 photoUrl） */
+        function normalizeRecordPhotos(record) {
+            if (!record) return [];
+            if (Array.isArray(record.photos) && record.photos.length) {
+                return record.photos.filter(u => typeof u === 'string' && u.trim()).map(u => u.trim());
+            }
+            if (record.photoUrl && typeof record.photoUrl === 'string' && record.photoUrl.trim()) {
+                return [record.photoUrl.trim()];
+            }
+            return [];
+        }
+
+        const MAX_RECORD_PHOTOS = 12;
 
 
         // 若有嵌入資料，強制寫入 localStorage（匯出的 HTML 用此還原紀錄）
@@ -370,6 +451,11 @@
             Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
             Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>,
             Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
+            Camera: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>,
+            Image: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>,
+            ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>,
+            ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
             Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>,
             Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>,
             Export: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>,
@@ -447,15 +533,154 @@
         };
 
         const ModalOverlay = ({ children, onClose }) => (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-safe-pad bg-black/50 backdrop-blur-sm"
                  onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-zinc-200 dark:border-zinc-800 max-h-[90vh] overflow-y-auto">
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-zinc-200 dark:border-zinc-800 max-h-[min(90vh,calc(100dvh-2rem))] overflow-y-auto">
                     {children}
                 </div>
             </div>
         );
 
+        // 全螢幕飲食相簿瀏覽（左右切換、鍵盤、觸控縮放／旋轉）
+        const PhotoLightbox = ({ photos, index, title, onClose, onIndexChange }) => {
+            const list = Array.isArray(photos) ? photos.filter(Boolean) : [];
+            const safeIndex = Math.min(Math.max(0, index || 0), Math.max(0, list.length - 1));
+            const current = list[safeIndex] || '';
+            const [zoom, setZoom] = useState(1);
+            const [rotation, setRotation] = useState(0);
+            const zoomRef = useRef(1);
+            const gestureRef = useRef(null);
+            const setZoomLevel = (value) => {
+                const next = Math.min(4, Math.max(1, value));
+                zoomRef.current = next;
+                setZoom(next);
+            };
+
+            useEffect(() => {
+                setZoomLevel(1);
+                setRotation(0);
+            }, [safeIndex]);
+
+            useEffect(() => {
+                const onKey = (e) => {
+                    if (e.key === 'Escape') onClose();
+                    if (e.key === 'ArrowLeft' && safeIndex > 0) onIndexChange(safeIndex - 1);
+                    if (e.key === 'ArrowRight' && safeIndex < list.length - 1) onIndexChange(safeIndex + 1);
+                };
+                window.addEventListener('keydown', onKey);
+                const prevOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                return () => {
+                    window.removeEventListener('keydown', onKey);
+                    document.body.style.overflow = prevOverflow;
+                };
+            }, [safeIndex, list.length, onClose, onIndexChange]);
+
+            if (!list.length) return null;
+
+            return (
+                <div className="fixed inset-0 z-[80] bg-black/95 flex flex-col"
+                    role="dialog" aria-modal="true" aria-label="瀏覽相片">
+                    <div className="flex items-center justify-between px-3 py-3 text-white shrink-0"
+                        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}>
+                        <div className="min-w-0 flex-1 pr-3">
+                            <div className="text-sm font-medium truncate">{title || '相片'}</div>
+                            <div className="text-xs text-white/60">{safeIndex + 1} / {list.length}</div>
+                        </div>
+                        <button type="button" onClick={onClose}
+                            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white" aria-label="關閉">
+                            <Icons.X />
+                        </button>
+                    </div>
+                    <div className="flex-1 relative flex items-center justify-center min-h-0 select-none"
+                        onTouchStart={(e) => {
+                            if (e.touches.length === 2) {
+                                const dx = e.touches[1].clientX - e.touches[0].clientX;
+                                const dy = e.touches[1].clientY - e.touches[0].clientY;
+                                gestureRef.current = {
+                                    distance: Math.hypot(dx, dy),
+                                    angle: Math.atan2(dy, dx) * 180 / Math.PI,
+                                    zoom,
+                                    rotation
+                                };
+                            } else if (e.touches.length === 1) {
+                                gestureRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, zoom };
+                            }
+                        }}
+                        onTouchMove={(e) => {
+                            if (e.touches.length !== 2 || !gestureRef.current || gestureRef.current.distance == null) return;
+                            e.preventDefault();
+                            const dx = e.touches[1].clientX - e.touches[0].clientX;
+                            const dy = e.touches[1].clientY - e.touches[0].clientY;
+                            const distance = Math.hypot(dx, dy);
+                            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                            let angleDelta = angle - gestureRef.current.angle;
+                            if (angleDelta > 180) angleDelta -= 360;
+                            if (angleDelta < -180) angleDelta += 360;
+                            setZoomLevel(gestureRef.current.zoom * distance / gestureRef.current.distance);
+                            setRotation(gestureRef.current.rotation + angleDelta);
+                        }}
+                        onTouchEnd={(e) => {
+                            const gesture = gestureRef.current;
+                            gestureRef.current = null;
+                            if (!gesture || gesture.x == null || zoomRef.current > 1.02) return;
+                            const dx = e.changedTouches[0].clientX - gesture.x;
+                            if (dx > 50 && safeIndex > 0) onIndexChange(safeIndex - 1);
+                            if (dx < -50 && safeIndex < list.length - 1) onIndexChange(safeIndex + 1);
+                        }}>
+                        {safeIndex > 0 && (
+                            <button type="button" onClick={() => onIndexChange(safeIndex - 1)}
+                                className="absolute left-2 z-10 p-2 rounded-full bg-black/40 text-white hover:bg-black/60" aria-label="上一張">
+                                <Icons.ChevronLeft />
+                            </button>
+                        )}
+                        <img src={current} alt={`相片 ${safeIndex + 1}`}
+                            className="max-w-full max-h-full object-contain px-2"
+                            style={{ maxHeight: 'calc(100dvh - 9rem)', transform: `scale(${zoom}) rotate(${rotation}deg)`, touchAction: 'none' }}
+                            draggable={false} />
+                        {safeIndex < list.length - 1 && (
+                            <button type="button" onClick={() => onIndexChange(safeIndex + 1)}
+                                className="absolute right-2 z-10 p-2 rounded-full bg-black/40 text-white hover:bg-black/60" aria-label="下一張">
+                                <Icons.ChevronRight />
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex flex-col items-center gap-1 shrink-0 pt-2 text-white"
+                        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))' }}>
+                        <div className="flex items-center justify-center gap-3">
+                            <button type="button" onClick={() => setZoomLevel(zoom - 0.25)}
+                                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20" aria-label="縮小">−</button>
+                            <span className="min-w-12 text-center text-xs text-white/70">{Math.round(zoom * 100)}%</span>
+                            <button type="button" onClick={() => setZoomLevel(zoom + 0.25)}
+                                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20" aria-label="放大">＋</button>
+                            <button type="button" onClick={() => setRotation(rotation - 90)}
+                                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20" aria-label="向左旋轉">↶</button>
+                            <button type="button" onClick={() => setRotation(rotation + 90)}
+                                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20" aria-label="向右旋轉">↷</button>
+                            <button type="button" onClick={() => { setZoomLevel(1); setRotation(0); }}
+                                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs">重設</button>
+                        </div>
+                        <span className="text-[10px] text-white/50">雙指捏合可縮放及旋轉</span>
+                    </div>
+                    {list.length > 1 && (
+                        <div className="shrink-0 px-3 pb-3 overflow-x-auto scrollbar-hide"
+                            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}>
+                            <div className="flex gap-2 justify-center min-w-min mx-auto">
+                                {list.map((src, i) => (
+                                    <button key={src + i} type="button" onClick={() => onIndexChange(i)}
+                                        className={`w-14 h-14 rounded-lg overflow-hidden border-2 shrink-0 ${i === safeIndex ? 'border-amber-400' : 'border-transparent opacity-60'}`}>
+                                        <img src={src} alt="" className="w-full h-full object-cover" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         const DiningForm = ({ initialData, onSave, onClose, settings }) => {
+
             const emptyDish = () => ({ name: '', price: '' });
             const initDishes = () => {
                 if (initialData && Array.isArray(initialData.dishes) && initialData.dishes.length) {
@@ -485,6 +710,76 @@
                 !!(initialData && initialData.amount != null && String(initialData.amount) !== '')
             );
             const [amountExpr, setAmountExpr] = useState(initialData ? String(initialData.amount) : '');
+            // 多張相片：已上傳 url 或本地預覽 + 待上傳 file
+            const [photoItems, setPhotoItems] = useState(() => {
+                const urls = normalizeRecordPhotos(initialData);
+                return urls.map((url, i) => ({
+                    key: 'exist-' + i + '-' + url.slice(-24),
+                    url,
+                    preview: url,
+                    file: null
+                }));
+            });
+            const [photoUploading, setPhotoUploading] = useState(false);
+            const [photoError, setPhotoError] = useState('');
+            const cameraInputRef = useRef(null);
+            const galleryInputRef = useRef(null);
+
+            const addPhotoFiles = (fileList) => {
+                const files = Array.from(fileList || []).filter(f => f && f.type && f.type.startsWith('image/'));
+                if (!files.length) {
+                    setPhotoError('請選擇圖片檔');
+                    return;
+                }
+                setPhotoItems(prev => {
+                    const room = MAX_RECORD_PHOTOS - prev.length;
+                    if (room <= 0) {
+                        setPhotoError(`最多 ${MAX_RECORD_PHOTOS} 張相片`);
+                        return prev;
+                    }
+                    const take = files.slice(0, room);
+                    const oversized = take.filter(f => f.size > 12 * 1024 * 1024);
+                    if (oversized.length) {
+                        setPhotoError('有圖片超過 12MB，已略過過大檔案');
+                    } else {
+                        setPhotoError('');
+                    }
+                    const ok = take.filter(f => f.size <= 12 * 1024 * 1024);
+                    if (!ok.length) return prev;
+                    const added = ok.map((file, i) => ({
+                        key: 'new-' + Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2, 7),
+                        url: null,
+                        preview: URL.createObjectURL(file),
+                        file,
+                        rotation: 0
+                    }));
+                    return [...prev, ...added];
+                });
+            };
+
+            const onPickPhoto = (e) => {
+                const files = Array.from(e.target.files || []);
+                e.target.value = '';
+                if (!files.length) return;
+                addPhotoFiles(files);
+            };
+
+            const removePhotoAt = (key) => {
+                setPhotoItems(prev => {
+                    const target = prev.find(p => p.key === key);
+                    if (target && target.preview && String(target.preview).startsWith('blob:')) {
+                        try { URL.revokeObjectURL(target.preview); } catch (err) { /* ignore */ }
+                    }
+                    return prev.filter(p => p.key !== key);
+                });
+                setPhotoError('');
+            };
+
+            const rotatePhotoAt = (key) => {
+                setPhotoItems(prev => prev.map(item => item.key === key && item.file
+                    ? { ...item, rotation: ((item.rotation || 0) + 90) % 360 }
+                    : item));
+            };
 
             const sumDishPrices = (list) => {
                 let sum = 0;
@@ -518,7 +813,7 @@
                 setDishes(prev => prev.length <= 1 ? [emptyDish()] : prev.filter((_, i) => i !== idx));
             };
 
-            const submit = (e) => {
+            const submit = async (e) => {
                 e.preventDefault();
                 let amountNum = evaluateExpression(amountExpr);
                 const cleanedDishes = dishes
@@ -541,8 +836,37 @@
                 }
                 const peopleNum = Math.max(1, parseInt(form.people, 10) || 1);
                 const ratingNum = Math.min(5, Math.max(0, Math.round(Number(form.rating) || 0)));
+                const recordId = (initialData && initialData.id) || generateId();
+
+                let finalPhotos = [];
+                try {
+                    setPhotoUploading(true);
+                    setPhotoError('');
+                    let uploadIndex = 0;
+                    for (const item of photoItems) {
+                        if (item.url) {
+                            finalPhotos.push(item.url);
+                            continue;
+                        }
+                        if (item.file) {
+                            const jpeg = await compressImageToJpeg(item.file, 1600, 0.85, item.rotation || 0);
+                            const url = await uploadRecordPhoto(jpeg, 'dining', recordId, uploadIndex++);
+                            finalPhotos.push(url);
+                        }
+                    }
+                    finalPhotos = finalPhotos.slice(0, MAX_RECORD_PHOTOS);
+                } catch (err) {
+                    console.error(err);
+                    setPhotoError((err && err.message) || '上傳相片失敗');
+                    setPhotoUploading(false);
+                    alert('相片上傳失敗：' + ((err && err.message) || '請檢查網路或 bucket 權限'));
+                    return;
+                } finally {
+                    setPhotoUploading(false);
+                }
+
                 onSave({
-                    id: (initialData && initialData.id) || generateId(),
+                    id: recordId,
                     date: form.date,
                     amount: Math.round(amountNum * 100) / 100,
                     currency: form.currency || 'HKD',
@@ -554,6 +878,8 @@
                     dishes: cleanedDishes.slice(0, 10),
                     dish: cleanedDishes.map(d => d.name).join('、'),
                     note: (form.note || '').trim(),
+                    photos: finalPhotos,
+                    photoUrl: finalPhotos[0] || null,
                     createdAt: (initialData && initialData.createdAt) || new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     linkedTxId: (initialData && initialData.linkedTxId) || null
@@ -668,6 +994,49 @@
                                 )}
                             </div>
                             <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium">餐點相片</label>
+                                    <span className="text-[11px] text-zinc-500">{photoItems.length}/{MAX_RECORD_PHOTOS}</span>
+                                </div>
+                                <p className="text-[11px] text-zinc-500 mb-2">記錄這餐吃過甚麼，可多張；上傳前可旋轉。儲存時會壓成 JPEG。</p>
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <button type="button" onClick={() => cameraInputRef.current && cameraInputRef.current.click()}
+                                        disabled={photoUploading || photoItems.length >= MAX_RECORD_PHOTOS}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50">
+                                        <Icons.Camera /> 拍照
+                                    </button>
+                                    <button type="button" onClick={() => galleryInputRef.current && galleryInputRef.current.click()}
+                                        disabled={photoUploading || photoItems.length >= MAX_RECORD_PHOTOS}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50">
+                                        <Icons.Image /> 相簿多選
+                                    </button>
+                                </div>
+                                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPickPhoto} />
+                                <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickPhoto} />
+                                {photoItems.length > 0 && (
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {photoItems.map((item, idx) => (
+                                            <div key={item.key} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 group">
+                                                <img src={item.preview} alt={`餐點 ${idx + 1}`} className="w-full h-full object-cover transition-transform"
+                                                    style={{ transform: `rotate(${item.rotation || 0}deg)` }} />
+                                                <div className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/55 text-white">{idx + 1}</div>
+                                                <div className="absolute top-1 right-1 flex gap-1">
+                                                    {item.file && (
+                                                        <button type="button" onClick={() => rotatePhotoAt(item.key)} disabled={photoUploading}
+                                                            className="w-7 h-7 rounded-full bg-black/65 text-white text-lg flex items-center justify-center hover:bg-amber-600 disabled:opacity-50"
+                                                            aria-label={`旋轉相片 ${idx + 1}`} title="向右旋轉 90°">↻</button>
+                                                    )}
+                                                    <button type="button" onClick={() => removePhotoAt(item.key)} disabled={photoUploading}
+                                                        className="w-7 h-7 rounded-full bg-black/60 text-white text-sm flex items-center justify-center hover:bg-red-600 disabled:opacity-50"
+                                                        aria-label="移除此相片">×</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {photoError && <p className="mt-1 text-xs text-red-500">{photoError}</p>}
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium mb-1">備註</label>
                                 <input value={form.note} onChange={e => setForm({...form, note: e.target.value})}
                                     placeholder="跟誰吃、評價…"
@@ -676,7 +1045,10 @@
                         </div>
                         <div className="flex justify-end gap-3 mt-6">
                             <button type="button" onClick={onClose} className="px-4 py-2 text-sm rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">取消</button>
-                            <button type="submit" className="px-5 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white">儲存</button>
+                            <button type="submit" disabled={photoUploading}
+                                className="px-5 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50">
+                                {photoUploading ? '上傳中…' : '儲存'}
+                            </button>
                         </div>
                     </form>
                 </ModalOverlay>
@@ -694,6 +1066,64 @@
             }));
             const [amountExpr, setAmountExpr] = useState(initialData ? String(initialData.amount) : '');
             const [calcPreview, setCalcPreview] = useState(null);
+            const [photoItems, setPhotoItems] = useState(() => normalizeRecordPhotos(initialData).map((url, i) => ({
+                key: 'exist-' + i + '-' + url.slice(-24),
+                url,
+                preview: url,
+                file: null,
+                rotation: 0
+            })));
+            const [photoUploading, setPhotoUploading] = useState(false);
+            const [photoError, setPhotoError] = useState('');
+            const cameraInputRef = useRef(null);
+            const galleryInputRef = useRef(null);
+
+            const addPhotoFiles = (fileList) => {
+                const files = Array.from(fileList || []).filter(f => f && f.type && f.type.startsWith('image/'));
+                if (!files.length) {
+                    setPhotoError('請選擇圖片檔');
+                    return;
+                }
+                setPhotoItems(prev => {
+                    const room = MAX_RECORD_PHOTOS - prev.length;
+                    if (room <= 0) {
+                        setPhotoError(`最多 ${MAX_RECORD_PHOTOS} 張相片`);
+                        return prev;
+                    }
+                    const take = files.slice(0, room);
+                    const oversized = take.filter(f => f.size > 12 * 1024 * 1024);
+                    setPhotoError(oversized.length ? '有圖片超過 12MB，已略過過大檔案' : '');
+                    const added = take.filter(f => f.size <= 12 * 1024 * 1024).map((file, i) => ({
+                        key: 'new-' + Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2, 7),
+                        url: null,
+                        preview: URL.createObjectURL(file),
+                        file,
+                        rotation: 0
+                    }));
+                    return [...prev, ...added];
+                });
+            };
+
+            const onPickPhoto = (e) => {
+                const files = Array.from(e.target.files || []);
+                e.target.value = '';
+                if (files.length) addPhotoFiles(files);
+            };
+
+            const removePhotoAt = (key) => {
+                setPhotoItems(prev => {
+                    const target = prev.find(p => p.key === key);
+                    if (target && target.preview && String(target.preview).startsWith('blob:')) URL.revokeObjectURL(target.preview);
+                    return prev.filter(p => p.key !== key);
+                });
+                setPhotoError('');
+            };
+
+            const rotatePhotoAt = (key) => {
+                setPhotoItems(prev => prev.map(item => item.key === key && item.file
+                    ? { ...item, rotation: ((item.rotation || 0) + 90) % 360 }
+                    : item));
+            };
 
             const getSymbol = (currencyKey) => {
                 if (currencyKey === 'CUSTOM') return settings.customSymbol || '$';
@@ -712,7 +1142,7 @@
                 }
             };
 
-            const submit = (e) => {
+            const submit = async (e) => {
                 e.preventDefault();
                 if (!(form.destination || '').trim()) {
                     alert('請填寫旅遊地點');
@@ -725,8 +1155,34 @@
                 }
                 const daysNum = Math.max(1, parseInt(form.days, 10) || 1);
                 const peopleNum = Math.max(1, parseInt(form.people, 10) || 1);
+                const recordId = (initialData && initialData.id) || generateId();
+                let finalPhotos = [];
+                try {
+                    setPhotoUploading(true);
+                    setPhotoError('');
+                    let uploadIndex = 0;
+                    for (const item of photoItems) {
+                        if (item.url) {
+                            finalPhotos.push(item.url);
+                            continue;
+                        }
+                        if (item.file) {
+                            const jpeg = await compressImageToJpeg(item.file, 1600, 0.85, item.rotation || 0);
+                            const url = await uploadRecordPhoto(jpeg, 'travel', recordId, uploadIndex++);
+                            finalPhotos.push(url);
+                        }
+                    }
+                    finalPhotos = finalPhotos.slice(0, MAX_RECORD_PHOTOS);
+                } catch (err) {
+                    console.error(err);
+                    setPhotoError((err && err.message) || '上傳相片失敗');
+                    alert('相片上傳失敗：' + ((err && err.message) || '請檢查網路或 bucket 權限'));
+                    return;
+                } finally {
+                    setPhotoUploading(false);
+                }
                 onSave({
-                    id: (initialData && initialData.id) || generateId(),
+                    id: recordId,
                     date: form.date,
                     amount: Math.round(amountNum * 100) / 100,
                     currency: form.currency || 'HKD',
@@ -734,6 +1190,8 @@
                     days: daysNum,
                     people: peopleNum,
                     note: (form.note || '').trim(),
+                    photos: finalPhotos,
+                    photoUrl: finalPhotos[0] || null,
                     createdAt: (initialData && initialData.createdAt) || new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     linkedTxId: (initialData && initialData.linkedTxId) || null
@@ -786,6 +1244,49 @@
                                 )}
                             </div>
                             <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium">旅遊相片</label>
+                                    <span className="text-[11px] text-zinc-500">{photoItems.length}/{MAX_RECORD_PHOTOS}</span>
+                                </div>
+                                <p className="text-[11px] text-zinc-500 mb-2">記錄旅途風景，可多張；上傳前可旋轉。儲存時會壓成 JPEG。</p>
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <button type="button" onClick={() => cameraInputRef.current && cameraInputRef.current.click()}
+                                        disabled={photoUploading || photoItems.length >= MAX_RECORD_PHOTOS}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50">
+                                        <Icons.Camera /> 拍照
+                                    </button>
+                                    <button type="button" onClick={() => galleryInputRef.current && galleryInputRef.current.click()}
+                                        disabled={photoUploading || photoItems.length >= MAX_RECORD_PHOTOS}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50">
+                                        <Icons.Image /> 相簿多選
+                                    </button>
+                                </div>
+                                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPickPhoto} />
+                                <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickPhoto} />
+                                {photoItems.length > 0 && (
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {photoItems.map((item, idx) => (
+                                            <div key={item.key} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 group">
+                                                <img src={item.preview} alt={`旅遊 ${idx + 1}`} className="w-full h-full object-cover transition-transform"
+                                                    style={{ transform: `rotate(${item.rotation || 0}deg)` }} />
+                                                <div className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/55 text-white">{idx + 1}</div>
+                                                <div className="absolute top-1 right-1 flex gap-1">
+                                                    {item.file && (
+                                                        <button type="button" onClick={() => rotatePhotoAt(item.key)} disabled={photoUploading}
+                                                            className="w-7 h-7 rounded-full bg-black/65 text-white text-lg flex items-center justify-center hover:bg-sky-600 disabled:opacity-50"
+                                                            aria-label={`旋轉相片 ${idx + 1}`} title="向右旋轉 90°">↻</button>
+                                                    )}
+                                                    <button type="button" onClick={() => removePhotoAt(item.key)} disabled={photoUploading}
+                                                        className="w-7 h-7 rounded-full bg-black/60 text-white text-sm flex items-center justify-center hover:bg-red-600 disabled:opacity-50"
+                                                        aria-label="移除此相片">×</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {photoError && <p className="mt-1 text-xs text-red-500">{photoError}</p>}
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium mb-1">備註</label>
                                 <input value={form.note} onChange={e => setForm({...form, note: e.target.value})}
                                     placeholder="行程、酒店、同行…"
@@ -794,7 +1295,10 @@
                         </div>
                         <div className="flex justify-end gap-3 mt-6">
                             <button type="button" onClick={onClose} className="px-4 py-2 text-sm rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">取消</button>
-                            <button type="submit" className="px-5 py-2 text-sm font-medium rounded-lg bg-sky-600 hover:bg-sky-700 text-white">儲存</button>
+                            <button type="submit" disabled={photoUploading}
+                                className="px-5 py-2 text-sm font-medium rounded-lg bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-50">
+                                {photoUploading ? '上傳中…' : '儲存'}
+                            </button>
                         </div>
                     </form>
                 </ModalOverlay>
@@ -818,8 +1322,66 @@
                     notes: item.notes || ''
                 };
             });
+            const [photoItems, setPhotoItems] = useState(() => normalizeRecordPhotos(initialData).map((url, i) => ({
+                key: 'exist-' + i + '-' + url.slice(-24),
+                url,
+                preview: url,
+                file: null,
+                rotation: 0
+            })));
+            const [photoUploading, setPhotoUploading] = useState(false);
+            const [photoError, setPhotoError] = useState('');
+            const cameraInputRef = useRef(null);
+            const galleryInputRef = useRef(null);
 
-            const submit = (e) => {
+            const addPhotoFiles = (fileList) => {
+                const files = Array.from(fileList || []).filter(f => f && f.type && f.type.startsWith('image/'));
+                if (!files.length) {
+                    setPhotoError('請選擇圖片檔');
+                    return;
+                }
+                setPhotoItems(prev => {
+                    const room = MAX_RECORD_PHOTOS - prev.length;
+                    if (room <= 0) {
+                        setPhotoError(`最多 ${MAX_RECORD_PHOTOS} 張相片`);
+                        return prev;
+                    }
+                    const take = files.slice(0, room);
+                    const oversized = take.filter(f => f.size > 12 * 1024 * 1024);
+                    setPhotoError(oversized.length ? '有圖片超過 12MB，已略過過大檔案' : '');
+                    const added = take.filter(f => f.size <= 12 * 1024 * 1024).map((file, i) => ({
+                        key: 'new-' + Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2, 7),
+                        url: null,
+                        preview: URL.createObjectURL(file),
+                        file,
+                        rotation: 0
+                    }));
+                    return [...prev, ...added];
+                });
+            };
+
+            const onPickPhoto = (e) => {
+                const files = Array.from(e.target.files || []);
+                e.target.value = '';
+                if (files.length) addPhotoFiles(files);
+            };
+
+            const removePhotoAt = (key) => {
+                setPhotoItems(prev => {
+                    const target = prev.find(p => p.key === key);
+                    if (target && target.preview && String(target.preview).startsWith('blob:')) URL.revokeObjectURL(target.preview);
+                    return prev.filter(p => p.key !== key);
+                });
+                setPhotoError('');
+            };
+
+            const rotatePhotoAt = (key) => {
+                setPhotoItems(prev => prev.map(item => item.key === key && item.file
+                    ? { ...item, rotation: ((item.rotation || 0) + 90) % 360 }
+                    : item));
+            };
+
+            const submit = async (e) => {
                 e.preventDefault();
                 if (!(form.name || '').trim()) {
                     alert('請填寫名稱');
@@ -836,8 +1398,34 @@
                         return;
                     }
                 }
+                const recordId = (initialData && initialData.id) || generateId();
+                let finalPhotos = [];
+                try {
+                    setPhotoUploading(true);
+                    setPhotoError('');
+                    let uploadIndex = 0;
+                    for (const item of photoItems) {
+                        if (item.url) {
+                            finalPhotos.push(item.url);
+                            continue;
+                        }
+                        if (item.file) {
+                            const jpeg = await compressImageToJpeg(item.file, 1600, 0.85, item.rotation || 0);
+                            const url = await uploadRecordPhoto(jpeg, 'buysell', recordId, uploadIndex++);
+                            finalPhotos.push(url);
+                        }
+                    }
+                    finalPhotos = finalPhotos.slice(0, MAX_RECORD_PHOTOS);
+                } catch (err) {
+                    console.error(err);
+                    setPhotoError((err && err.message) || '上傳相片失敗');
+                    alert('相片上傳失敗：' + ((err && err.message) || '請檢查網路或 bucket 權限'));
+                    return;
+                } finally {
+                    setPhotoUploading(false);
+                }
                 onSave({
-                    id: (initialData && initialData.id) || generateId(),
+                    id: recordId,
                     name: form.name.trim(),
                     category: form.category || '電話',
                     currency: form.currency || 'HKD',
@@ -849,6 +1437,8 @@
                     sellPrice: status === 'sold' ? sellPriceNum : null,
                     serial: (form.serial || '').trim(),
                     notes: (form.notes || '').trim(),
+                    photos: finalPhotos,
+                    photoUrl: finalPhotos[0] || null,
                     linkedBuyTxId: (initialData && initialData.linkedBuyTxId) || null,
                     linkedSellTxId: (initialData && initialData.linkedSellTxId) || null,
                     updatedAt: new Date().toISOString(),
@@ -934,6 +1524,49 @@
                                     className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800" />
                             </div>
                             <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium">物件相片</label>
+                                    <span className="text-[11px] text-zinc-500">{photoItems.length}/{MAX_RECORD_PHOTOS}</span>
+                                </div>
+                                <p className="text-[11px] text-zinc-500 mb-2">記錄物件外觀或收據，可多張；上傳前可旋轉。儲存時會壓成 JPEG。</p>
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <button type="button" onClick={() => cameraInputRef.current && cameraInputRef.current.click()}
+                                        disabled={photoUploading || photoItems.length >= MAX_RECORD_PHOTOS}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50">
+                                        <Icons.Camera /> 拍照
+                                    </button>
+                                    <button type="button" onClick={() => galleryInputRef.current && galleryInputRef.current.click()}
+                                        disabled={photoUploading || photoItems.length >= MAX_RECORD_PHOTOS}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50">
+                                        <Icons.Image /> 相簿多選
+                                    </button>
+                                </div>
+                                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPickPhoto} />
+                                <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickPhoto} />
+                                {photoItems.length > 0 && (
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {photoItems.map((item, idx) => (
+                                            <div key={item.key} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 group">
+                                                <img src={item.preview} alt={`物件 ${idx + 1}`} className="w-full h-full object-cover transition-transform"
+                                                    style={{ transform: `rotate(${item.rotation || 0}deg)` }} />
+                                                <div className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/55 text-white">{idx + 1}</div>
+                                                <div className="absolute top-1 right-1 flex gap-1">
+                                                    {item.file && (
+                                                        <button type="button" onClick={() => rotatePhotoAt(item.key)} disabled={photoUploading}
+                                                            className="w-7 h-7 rounded-full bg-black/65 text-white text-lg flex items-center justify-center hover:bg-violet-600 disabled:opacity-50"
+                                                            aria-label={`旋轉相片 ${idx + 1}`} title="向右旋轉 90°">↻</button>
+                                                    )}
+                                                    <button type="button" onClick={() => removePhotoAt(item.key)} disabled={photoUploading}
+                                                        className="w-7 h-7 rounded-full bg-black/60 text-white text-sm flex items-center justify-center hover:bg-red-600 disabled:opacity-50"
+                                                        aria-label="移除此相片">×</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {photoError && <p className="mt-1 text-xs text-red-500">{photoError}</p>}
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium mb-1">備註</label>
                                 <input value={form.notes} onChange={e => setForm({...form, notes: e.target.value})}
                                     placeholder="配件、維修、買家…"
@@ -942,7 +1575,10 @@
                         </div>
                         <div className="flex justify-end gap-3 mt-6">
                             <button type="button" onClick={onClose} className="px-4 py-2 text-sm rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">取消</button>
-                            <button type="submit" className="px-5 py-2 text-sm font-medium rounded-lg bg-violet-600 hover:bg-violet-700 text-white">儲存</button>
+                            <button type="submit" disabled={photoUploading}
+                                className="px-5 py-2 text-sm font-medium rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
+                                {photoUploading ? '上傳中…' : '儲存'}
+                            </button>
                         </div>
                     </form>
                 </ModalOverlay>
@@ -1669,6 +2305,7 @@
             const [diningFilterMonth, setDiningFilterMonth] = useState('all');
             const [isDiningFormOpen, setIsDiningFormOpen] = useState(false);
             const [editingDining, setEditingDining] = useState(null);
+            const [photoViewer, setPhotoViewer] = useState(null); // { photos, index, title }
             const [travelSearch, setTravelSearch] = useState('');
             const [travelFilterMonth, setTravelFilterMonth] = useState('all');
             const [isTravelFormOpen, setIsTravelFormOpen] = useState(false);
@@ -1688,7 +2325,6 @@
             const [editingBuySell, setEditingBuySell] = useState(null);
             const [buySellForceSell, setBuySellForceSell] = useState(false);
             const [syncStatus, setSyncStatus] = useState('就緒');
-            const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
             const cloudReady = useRef(false);
             const cloudTimer = useRef(null);
             // FIX(P0-1): 雲端衝突待使用者選擇時，暫停自動 push，避免覆蓋較新雲端
@@ -2018,17 +2654,13 @@
                 })();
 
                 const onOnline = () => {
-                    setIsOnline(true);
                     setSyncStatus('連線中…');
                     // 先拉雲端再視需要推
                     pullAndReconcile({ silent: true }).finally(() => scheduleCloud());
                     const sb = getSb();
                     if (sb) setupRealtime(sb);
                 };
-                const onOffline = () => {
-                    setIsOnline(false);
-                    setSyncStatus('離線');
-                };
+                const onOffline = () => setSyncStatus('離線');
                 // PWA 回到前景時再拉一次（Realtime 斷線時的備援）
                 const onVisibility = () => {
                     if (document.visibilityState === 'visible' && navigator.onLine && cloudReady.current) {
@@ -3168,17 +3800,11 @@
 
             return (
                 <div className="min-h-screen pb-24 md:pb-12 font-sans selection:bg-zinc-200 dark:selection:bg-zinc-700">
-                    <header className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
+                    <header className="sticky-safe-header sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
                         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
                             <h1 className="text-lg font-bold flex items-center gap-2.5 tracking-tight">
                                 <img src={KUMAMON_LOGO_SRC} alt="熊本熊" className="kumamon-logo" />
                                 Kumamon 記帳
-                                <span
-                                    className={`inline-block w-2 h-2 rounded-full ml-1.5 shrink-0 ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                                    title={isOnline ? '已連線' : '離線模式 · 本機資料可用'}
-                                    aria-label={isOnline ? '網路已連線' : '目前離線'}
-                                    role="status"
-                                />
                             </h1>
                             <div className="flex items-center gap-1">
                                 {/* FIX(P1-6): 接上「匯出含資料 HTML」UI */}
@@ -3216,17 +3842,6 @@
                         </div>
                     </div>
 
-                    {!isOnline && (
-                        <div className="max-w-3xl mx-auto px-4 pt-3">
-                            <div className="rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 px-3 py-2 text-xs flex items-start gap-2">
-                                <span className="mt-0.5">📡</span>
-                                <div>
-                                    <div className="font-medium">離線模式</div>
-                                    <div className="text-amber-800/90 dark:text-amber-200/90">本機帳本可正常瀏覽與記帳；雲端同步需恢復網絡後自動重試。</div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                     <main className="max-w-3xl mx-auto px-4 py-6 space-y-6"
                         onTouchStart={onSwipeStart}
                         onTouchEnd={onSwipeEnd}>
@@ -3261,42 +3876,58 @@
                                     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
                                         {filteredDining.slice(0, diningVisibleCount).map(d => {
                                             const symbol = d.currency === 'CUSTOM' ? (settings.customSymbol || '$') : (CURRENCY_OPTIONS.find(c => c.key === (d.currency || 'HKD'))?.defaultSymbol || 'HK$');
+                                            const photos = normalizeRecordPhotos(d);
                                             return (
-                                                <div key={d.id} className="p-3.5 flex items-start justify-between gap-3 group">
-                                                    <div className="min-w-0">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="font-semibold truncate">{d.restaurant}</span>
-                                                            {d.cuisine && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">{d.cuisine}</span>}
-                                                            <span className="text-xs text-zinc-400">{d.date}</span>
-                                                        </div>
-                                                        {(d.rating > 0) && (
-                                                            <div className="text-amber-400 text-sm leading-none mt-0.5 tracking-tight" aria-label={`評分 ${d.rating} 星`}>
-                                                                {'★'.repeat(Math.min(5, Math.round(d.rating)))}
-                                                                <span className="text-zinc-300 dark:text-zinc-600">{'★'.repeat(Math.max(0, 5 - Math.min(5, Math.round(d.rating))))}</span>
-                                                                <span className="text-xs text-zinc-500 ml-1">{d.rating}/5</span>
+                                                <div key={d.id} className="p-3.5 group">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="font-semibold truncate">{d.restaurant}</span>
+                                                                {d.cuisine && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">{d.cuisine}</span>}
+                                                                <span className="text-xs text-zinc-400">{d.date}</span>
+                                                                {photos.length > 0 && (
+                                                                    <button type="button"
+                                                                        onClick={() => setPhotoViewer({ photos, index: 0, title: (d.restaurant || '飲食') + (d.date ? ' · ' + d.date : '') })}
+                                                                        className="inline-flex items-center gap-1 p-1 rounded-md text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300"
+                                                                        aria-label={`瀏覽全部 ${photos.length} 張相片`}
+                                                                        title={`瀏覽全部 ${photos.length} 張相片`}>
+                                                                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-300 dark:ring-amber-700">
+                                                                            <Icons.Image />
+                                                                            <span className="text-[10px] font-semibold">{photos.length}</span>
+                                                                        </span>
+                                                                    </button>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                        <div className="text-xs text-zinc-500 mt-0.5 space-y-0.5">
-                                                            <div className="flex flex-wrap gap-x-2">
-                                                                {d.location && <span>📍 {d.location}</span>}
-                                                                {d.people ? <span>👥 {d.people} 人</span> : null}
-                                                            </div>
-                                                            {Array.isArray(d.dishes) && d.dishes.length > 0 ? (
-                                                                <div className="text-zinc-600 dark:text-zinc-400">
-                                                                    🍽 {d.dishes.map(x => x.name + (x.price != null ? ` ($${x.price})` : '')).join('、')}
+                                                            {(d.rating > 0) && (
+                                                                <div className="text-amber-400 text-sm leading-none mt-0.5 tracking-tight" aria-label={`評分 ${d.rating} 星`}>
+                                                                    {'★'.repeat(Math.min(5, Math.round(d.rating)))}
+                                                                    <span className="text-zinc-300 dark:text-zinc-600">{'★'.repeat(Math.max(0, 5 - Math.min(5, Math.round(d.rating))))}</span>
+                                                                    <span className="text-xs text-zinc-500 ml-1">{d.rating}/5</span>
                                                                 </div>
-                                                            ) : (d.dish ? <div>🍽 {d.dish}</div> : null)}
-                                                            {d.note && <div className="text-zinc-400">{d.note}</div>}
+                                                            )}
+                                                            <div className="text-xs text-zinc-500 mt-0.5 space-y-0.5">
+                                                                <div className="flex flex-wrap gap-x-2">
+                                                                    {d.location && <span>📍 {d.location}</span>}
+                                                                    {d.people ? <span>👥 {d.people} 人</span> : null}
+                                                                </div>
+                                                                {Array.isArray(d.dishes) && d.dishes.length > 0 ? (
+                                                                    <div className="text-zinc-600 dark:text-zinc-400">
+                                                                        🍽 {d.dishes.map(x => x.name + (x.price != null ? ` ($${x.price})` : '')).join('、')}
+                                                                    </div>
+                                                                ) : (d.dish ? <div>🍽 {d.dish}</div> : null)}
+                                                                {d.note && <div className="text-zinc-400">{d.note}</div>}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 shrink-0">
-                                                        <div className="font-mono font-semibold text-sm">−{symbol}{Number(d.amount).toLocaleString()}</div>
-                                                        <button type="button" onClick={() => { setEditingDining(d); setIsDiningFormOpen(true); }} className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white" aria-label="編輯"><Icons.Edit /></button>
-                                                        <button type="button" onClick={() => handleDeleteDining(d.id)} className="p-1.5 text-zinc-400 hover:text-red-600" aria-label="刪除"><Icons.Trash /></button>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <div className="font-mono font-semibold text-sm">−{symbol}{Number(d.amount).toLocaleString()}</div>
+                                                            <button type="button" onClick={() => { setEditingDining(d); setIsDiningFormOpen(true); }} className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white" aria-label="編輯"><Icons.Edit /></button>
+                                                            <button type="button" onClick={() => handleDeleteDining(d.id)} className="p-1.5 text-zinc-400 hover:text-red-600" aria-label="刪除"><Icons.Trash /></button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
                                         })}
+
                                         <LoadMoreButton
                                             shown={Math.min(diningVisibleCount, filteredDining.length)}
                                             total={filteredDining.length}
@@ -3332,12 +3963,25 @@
                                     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
                                         {filteredTravel.slice(0, travelVisibleCount).map(d => {
                                             const symbol = d.currency === 'CUSTOM' ? (settings.customSymbol || '$') : (CURRENCY_OPTIONS.find(c => c.key === (d.currency || 'HKD'))?.defaultSymbol || 'HK$');
+                                            const photos = normalizeRecordPhotos(d);
                                             return (
                                                 <div key={d.id} className="p-3.5 flex items-start justify-between gap-3 group">
                                                     <div className="min-w-0">
                                                         <div className="flex flex-wrap items-center gap-2">
                                                             <span className="font-semibold truncate">{d.destination}</span>
                                                             <span className="text-xs text-zinc-400">{d.date}</span>
+                                                            {photos.length > 0 && (
+                                                                <button type="button"
+                                                                    onClick={() => setPhotoViewer({ photos, index: 0, title: (d.destination || '旅遊') + (d.date ? ' · ' + d.date : '') })}
+                                                                    className="inline-flex items-center gap-1 p-1 rounded-md text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300"
+                                                                    aria-label={`瀏覽全部 ${photos.length} 張相片`}
+                                                                    title={`瀏覽全部 ${photos.length} 張相片`}>
+                                                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-sky-100 dark:bg-sky-900/50 ring-1 ring-sky-300 dark:ring-sky-700">
+                                                                        <Icons.Image />
+                                                                        <span className="text-[10px] font-semibold">{photos.length}</span>
+                                                                    </span>
+                                                                </button>
+                                                            )}
                                                         </div>
                                                         <div className="text-xs text-zinc-500 mt-0.5 space-y-0.5">
                                                             <div className="flex flex-wrap gap-x-2">
@@ -3423,6 +4067,7 @@
                                             const cur = i.currency || 'HKD';
                                             const curOpt = CURRENCY_OPTIONS.find(c => c.key === cur) || CURRENCY_OPTIONS[0];
                                             const curMeta = { label: curOpt.label, symbol: cur === 'CUSTOM' ? (settings.customSymbol || '$') : curOpt.defaultSymbol };
+                                            const photos = normalizeRecordPhotos(i);
                                             const hold = buySellHoldingText(i.buyDate, sold ? i.sellDate : null);
                                             const pnl = sold ? (Number(i.sellPrice) || 0) - (Number(i.buyPrice) || 0) : null;
                                             const pnlHkd = sold ? buySellToHKD(i.sellPrice, cur) - buySellToHKD(i.buyPrice, cur) : null;
@@ -3434,6 +4079,18 @@
                                                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${sold ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500' : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'}`}>{sold ? '已賣出' : '持有中'}</span>
                                                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">{i.category || '其他'}</span>
                                                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">{curMeta.label}</span>
+                                                            {photos.length > 0 && (
+                                                                <button type="button"
+                                                                    onClick={() => setPhotoViewer({ photos, index: 0, title: (i.name || '物件') + (i.buyDate ? ' · ' + i.buyDate : '') })}
+                                                                    className="inline-flex items-center gap-1 p-1 rounded-md text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300"
+                                                                    aria-label={`瀏覽全部 ${photos.length} 張相片`}
+                                                                    title={`瀏覽全部 ${photos.length} 張相片`}>
+                                                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-violet-100 dark:bg-violet-900/50 ring-1 ring-violet-300 dark:ring-violet-700">
+                                                                        <Icons.Image />
+                                                                        <span className="text-[10px] font-semibold">{photos.length}</span>
+                                                                    </span>
+                                                                </button>
+                                                            )}
                                                         </div>
                                                         <div className="mt-1 text-xs text-zinc-500 space-y-0.5">
                                                             <div>買入 {i.buyDate || '—'} · {curMeta.symbol}{(Number(i.buyPrice) || 0).toLocaleString()}{i.buyFrom ? ` · ${i.buyFrom}` : ''}</div>
@@ -3638,7 +4295,7 @@
                                 setIsFormOpen(true);
                             }
                         }}
-                        className={`fixed bottom-6 right-6 md:bottom-8 md:right-8 p-4 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-transform z-40 flex items-center justify-center ${mainTab === 'dining' ? 'bg-amber-600 text-white' : mainTab === 'travel' ? 'bg-sky-600 text-white' : mainTab === 'buysell' ? 'bg-violet-600 text-white' : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'}`}
+                        className={`fixed fab-safe right-6 p-4 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-transform z-40 flex items-center justify-center ${mainTab === 'dining' ? 'bg-amber-600 text-white' : mainTab === 'travel' ? 'bg-sky-600 text-white' : mainTab === 'buysell' ? 'bg-violet-600 text-white' : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'}`}
                         title={mainTab === 'dining' ? '新增飲食' : mainTab === 'travel' ? '新增旅遊' : mainTab === 'buysell' ? '新增物件' : '新增紀錄'}
                         aria-label={mainTab === 'dining' ? '新增飲食記錄' : mainTab === 'travel' ? '新增旅遊記錄' : mainTab === 'buysell' ? '新增買賣物件' : '新增記帳紀錄'}><Icons.Plus /></button>
 
@@ -3651,6 +4308,15 @@
                         <DiningForm initialData={editingDining} onSave={handleSaveDining}
                             onClose={() => { setIsDiningFormOpen(false); setEditingDining(null); }}
                             settings={settings} />
+                    )}
+                    {photoViewer && photoViewer.photos && photoViewer.photos.length > 0 && (
+                        <PhotoLightbox
+                            photos={photoViewer.photos}
+                            index={photoViewer.index || 0}
+                            title={photoViewer.title || ''}
+                            onClose={() => setPhotoViewer(null)}
+                            onIndexChange={(i) => setPhotoViewer(prev => prev ? { ...prev, index: i } : null)}
+                        />
                     )}
                     {isTravelFormOpen && (
                         <TravelForm initialData={editingTravel} onSave={handleSaveTravel}
@@ -3721,39 +4387,11 @@
         root.render(<App />);
     </script>
     <script>
-        // Service Worker：註冊失敗不影響本機 localStorage 帳本
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js', { scope: './' })
-                    .then((reg) => {
-                        console.info('[Kumamon PWA] SW registered', reg.scope);
-                        // 讓 waiting 中的新 SW 立刻 activate（對應 sw message listener）
-                        const kick = (worker) => {
-                            if (!worker) return;
-                            try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (_) {}
-                        };
-                        if (reg.waiting) kick(reg.waiting);
-                        reg.addEventListener('updatefound', () => {
-                            const w = reg.installing;
-                            if (!w) return;
-                            w.addEventListener('statechange', () => {
-                                if (w.state === 'installed' && navigator.serviceWorker.controller) {
-                                    kick(w);
-                                }
-                            });
-                        });
-                    })
-                    .catch((err) => {
-                        console.warn('[Kumamon PWA] SW failed (App 仍可用本機模式)', err);
-                    });
-
-                // 新 SW 取得控制權後重整一次，避免舊頁面仍掛舊 cache／白屏
-                let refreshing = false;
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    if (refreshing) return;
-                    refreshing = true;
-                    window.location.reload();
-                });
+                    .then((reg) => console.info('[Kumamon PWA] SW registered', reg.scope))
+                    .catch((err) => console.warn('[Kumamon PWA] SW failed', err));
             });
         }
     </script>
