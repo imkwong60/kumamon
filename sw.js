@@ -1,5 +1,5 @@
 /* Kumamon 記帳 Service Worker */
-const CACHE = 'kumamon-v8';
+const CACHE = 'kumamon-v9';
 const PRECACHE = [
   './',
   './index.html',
